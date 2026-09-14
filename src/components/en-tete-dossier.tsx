@@ -51,10 +51,10 @@ export function EnTeteDossier({ id }: { id: string }) {
             ? "border-blue-600 bg-blue-600 text-white"
             : atteinte
               ? "border-blue-200 bg-blue-50 text-blue-800 hover:bg-blue-100 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-200"
-              : "border-zinc-200 bg-white text-zinc-400 dark:border-zinc-800 dark:bg-zinc-950";
+              : "border-slate-200 bg-white text-slate-400 dark:border-slate-800 dark:bg-slate-950";
           const contenu = (
             <>
-              <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-xs font-semibold ${active ? "bg-white text-blue-700" : atteinte ? "bg-blue-600 text-white" : "bg-zinc-200 text-zinc-500 dark:bg-zinc-800"}`}>
+              <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-xs font-semibold ${active ? "bg-white text-blue-700" : atteinte ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-500 dark:bg-slate-800"}`}>
                 {i < indexCourant ? "✓" : e.numero}
               </span>
               {e.libelle}

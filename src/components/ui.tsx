@@ -8,7 +8,7 @@ import { useSyncExternalStore, type ReactNode } from "react";
 export type Teinte = "neutre" | "primaire" | "succes" | "attention" | "danger" | "info";
 
 const TEINTES: Record<Teinte, string> = {
-  neutre: "bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:border-zinc-700",
+  neutre: "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700",
   primaire: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-200 dark:border-blue-900",
   succes: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-200 dark:border-emerald-900",
   attention: "bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950 dark:text-amber-200 dark:border-amber-900",
@@ -45,7 +45,7 @@ type BoutonProps = {
 
 const VARIANTES: Record<NonNullable<BoutonProps["variante"]>, string> = {
   primaire: "bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-300",
-  secondaire: "border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800",
+  secondaire: "border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800",
   danger: "bg-red-600 text-white hover:bg-red-700",
   discret: "text-blue-700 hover:underline dark:text-blue-300",
 };
@@ -68,12 +68,12 @@ export function Bouton({ children, onClick, href, variante = "primaire", disable
 
 export function Carte({ titre, sousTitre, actions, children, className = "" }: { titre?: ReactNode; sousTitre?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={`rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950 ${className}`}>
+    <section className={`rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950 ${className}`}>
       {titre ? (
-        <header className="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
+        <header className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800">
           <div>
             <h2 className="text-base font-semibold">{titre}</h2>
-            {sousTitre ? <p className="mt-0.5 text-sm text-zinc-500">{sousTitre}</p> : null}
+            {sousTitre ? <p className="mt-0.5 text-sm text-slate-500">{sousTitre}</p> : null}
           </div>
           {actions}
         </header>
@@ -85,8 +85,8 @@ export function Carte({ titre, sousTitre, actions, children, className = "" }: {
 
 export function Chargement({ texte = "Chargement…" }: { texte?: string }) {
   return (
-    <div className="flex items-center gap-3 text-sm text-zinc-500" role="status">
-      <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-blue-600" aria-hidden />
+    <div className="flex items-center gap-3 text-sm text-slate-500" role="status">
+      <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600" aria-hidden />
       {texte}
     </div>
   );
@@ -106,7 +106,7 @@ export function Titre({ surtitre, titre, description, actions }: { surtitre?: st
       <div className="flex flex-col gap-1">
         {surtitre ? <p className="text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">{surtitre}</p> : null}
         <h1 className="text-2xl font-semibold tracking-tight">{titre}</h1>
-        {description ? <p className="max-w-3xl text-sm text-zinc-600 dark:text-zinc-400">{description}</p> : null}
+        {description ? <p className="max-w-3xl text-sm text-slate-600 dark:text-slate-400">{description}</p> : null}
       </div>
       {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
     </div>

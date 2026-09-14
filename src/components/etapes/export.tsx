@@ -106,7 +106,7 @@ export function EtapeExport({ id }: { id: string }) {
       <div className="grid gap-6 lg:grid-cols-2">
         <Carte titre="Usager dans Solis" sousTitre="Logiciel métier (simulation)">
           {dossier.export ? (
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">Export effectué.</p>
+            <p className="text-sm text-slate-600 dark:text-slate-400">Export effectué.</p>
           ) : !recherche ? (
             <Chargement texte="Recherche de l'usager dans Solis…" />
           ) : recherche.trouve ? (
@@ -119,10 +119,10 @@ export function EtapeExport({ id }: { id: string }) {
                 <strong>{recherche.usager.numeroUsager}</strong> · {recherche.usager.prenoms} {recherche.usager.nomNaissance}
                 {recherche.usager.nomUsage ? ` (${recherche.usager.nomUsage})` : ""} · né(e) le {recherche.usager.dateNaissance}
               </p>
-              <p className="text-zinc-500">{recherche.usager.adresse}</p>
+              <p className="text-slate-500">{recherche.usager.adresse}</p>
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b border-zinc-200 text-left text-zinc-500 dark:border-zinc-800">
+                  <tr className="border-b border-slate-200 text-left text-slate-500 dark:border-slate-800">
                     <th className="py-1 pr-2 font-medium">Dossier</th>
                     <th className="py-1 pr-2 font-medium">Type</th>
                     <th className="py-1 pr-2 font-medium">Date</th>
@@ -131,7 +131,7 @@ export function EtapeExport({ id }: { id: string }) {
                 </thead>
                 <tbody>
                   {recherche.usager.dossiers.map((d) => (
-                    <tr key={d.numero} className="border-b border-zinc-100 dark:border-zinc-900">
+                    <tr key={d.numero} className="border-b border-slate-100 dark:border-slate-900">
                       <td className="py-1 pr-2 font-mono">{d.numero}</td>
                       <td className="py-1 pr-2">{d.type}</td>
                       <td className="py-1 pr-2">{d.dateDemande}</td>
@@ -140,7 +140,7 @@ export function EtapeExport({ id }: { id: string }) {
                   ))}
                 </tbody>
               </table>
-              <p className="text-zinc-600 dark:text-zinc-400">Ce n&apos;est pas une première demande : la nouvelle demande sera rattachée à cet usager.</p>
+              <p className="text-slate-600 dark:text-slate-400">Ce n&apos;est pas une première demande : la nouvelle demande sera rattachée à cet usager.</p>
             </div>
           ) : (
             <div className="flex flex-col gap-2 text-sm">
@@ -163,19 +163,19 @@ export function EtapeExport({ id }: { id: string }) {
           }
         >
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-            <dt className="text-zinc-500">Usager</dt>
+            <dt className="text-slate-500">Usager</dt>
             <dd>{nomUsager(dossier) ?? "—"}</dd>
-            <dt className="text-zinc-500">NIR</dt>
+            <dt className="text-slate-500">NIR</dt>
             <dd className="font-mono">{nir ?? "—"}</dd>
-            <dt className="text-zinc-500">Recevabilité</dt>
+            <dt className="text-slate-500">Recevabilité</dt>
             <dd>{dossier.conformite?.recevabilite ?? "—"}</dd>
-            <dt className="text-zinc-500">Orientation</dt>
+            <dt className="text-slate-500">Orientation</dt>
             <dd>{dossier.decision?.orientationRetenue ? LIBELLES_ORIENTATION[dossier.decision.orientationRetenue] : "—"}</dd>
-            <dt className="text-zinc-500">Pièces</dt>
+            <dt className="text-slate-500">Pièces</dt>
             <dd>{(dossier.pieces ?? []).length}</dd>
           </dl>
           {voirMetadonnees ? (
-            <pre className="mt-3 max-h-96 overflow-auto rounded-md border border-zinc-200 bg-zinc-50 p-3 font-mono text-xs dark:border-zinc-800 dark:bg-zinc-900">
+            <pre className="mt-3 max-h-96 overflow-auto rounded-md border border-slate-200 bg-slate-50 p-3 font-mono text-xs dark:border-slate-800 dark:bg-slate-900">
               {JSON.stringify(metadonnees, null, 2)}
             </pre>
           ) : null}

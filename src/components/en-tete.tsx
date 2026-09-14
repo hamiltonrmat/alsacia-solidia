@@ -3,7 +3,7 @@ import Link from "next/link";
 /** Barre de navigation principale. */
 export function EnTete() {
   return (
-    <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+    <header className="border-b border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
       <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
         <Link href="/" className="flex items-center gap-2">
           <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-blue-600 text-xs font-bold text-white">IO</span>
@@ -15,13 +15,13 @@ export function EnTete() {
           </span>
         </Link>
         <nav className="flex items-center gap-1 text-sm">
-          <Link href="/" className="rounded-md px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800">
+          <Link href="/" className="rounded-md px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800">
             Accueil
           </Link>
-          <Link href="/ged" className="rounded-md px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800">
+          <Link href="/ged" className="rounded-md px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800">
             Import GED
           </Link>
-          <Link href="/outils/ocr" className="rounded-md px-3 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800">
+          <Link href="/outils/ocr" className="rounded-md px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800">
             Banc d&apos;essai OCR
           </Link>
         </nav>

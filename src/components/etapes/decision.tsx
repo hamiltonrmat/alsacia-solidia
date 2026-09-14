@@ -84,10 +84,10 @@ export function EtapeDecision({ id }: { id: string }) {
         <Carte titre="Règles appliquées">
           <ul className="flex flex-col gap-2">
             {resultat.regles.map((r) => (
-              <li key={r.id} className="flex flex-wrap items-start justify-between gap-2 rounded-md border border-zinc-200 p-3 dark:border-zinc-800">
+              <li key={r.id} className="flex flex-wrap items-start justify-between gap-2 rounded-md border border-slate-200 p-3 dark:border-slate-800">
                 <div className="min-w-0 flex-1">
                   <p className="font-medium">{r.libelle}</p>
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400">{r.detail}</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400">{r.detail}</p>
                 </div>
                 <Badge teinte={STATUTS[r.statut].teinte}>{STATUTS[r.statut].libelle}</Badge>
               </li>
@@ -99,8 +99,8 @@ export function EtapeDecision({ id }: { id: string }) {
           {resultat.girEstime ? (
             <Carte titre="Perte d'autonomie estimée" sousTitre="Indicatif, d'après le certificat médical">
               <p className="text-2xl font-semibold">GIR {resultat.girEstime.gir}</p>
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">{resultat.girEstime.libelle}</p>
-              <p className="mt-2 text-xs text-zinc-500">
+              <p className="text-sm text-slate-600 dark:text-slate-400">{resultat.girEstime.libelle}</p>
+              <p className="mt-2 text-xs text-slate-500">
                 Score {resultat.girEstime.score}/28 sur {resultat.girEstime.itemsRenseignes} items. L&apos;évaluation AGGIR à domicile fait foi.
               </p>
             </Carte>
@@ -108,9 +108,9 @@ export function EtapeDecision({ id }: { id: string }) {
 
           <Carte titre="Décision de l'agent">
             <fieldset className="flex flex-col gap-2">
-              <legend className="mb-1 text-sm text-zinc-600 dark:text-zinc-400">Orientation retenue</legend>
+              <legend className="mb-1 text-sm text-slate-600 dark:text-slate-400">Orientation retenue</legend>
               {ORIENTATIONS.map((o) => (
-                <label key={o} className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm ${retenue === o ? "border-blue-500 bg-blue-50 dark:bg-blue-950" : "border-zinc-200 dark:border-zinc-800"}`}>
+                <label key={o} className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm ${retenue === o ? "border-blue-500 bg-blue-50 dark:bg-blue-950" : "border-slate-200 dark:border-slate-800"}`}>
                   <input type="radio" name="orientation" value={o} checked={retenue === o} onChange={() => setOrientation(o)} />
                   <span>{LIBELLES_ORIENTATION[o]}</span>
                   {o === resultat.orientation ? <Badge teinte="info">proposée</Badge> : null}
@@ -124,7 +124,7 @@ export function EtapeDecision({ id }: { id: string }) {
                 onChange={(e) => setCommentaire(e.target.value)}
                 rows={4}
                 placeholder="Motivation, points à signaler à l'instruction…"
-                className="w-full rounded-md border border-zinc-300 bg-white p-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                className="w-full rounded-md border border-slate-300 bg-white p-2 text-sm dark:border-slate-700 dark:bg-slate-900"
               />
             </label>
           </Carte>

@@ -28,13 +28,13 @@ export function DossiersEnCours() {
       <h2 className="text-lg font-semibold">Dossiers en cours dans ce poste de travail</h2>
       <ul className="grid gap-3 sm:grid-cols-2">
         {liste.map((d) => (
-          <li key={d.id} className="flex flex-col gap-2 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+          <li key={d.id} className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
             <div className="flex items-start justify-between gap-2">
               <div>
                 <p className="font-medium">
-                  {d.id} <span className="text-zinc-500">· {nomUsager(d) ?? d.libelle}</span>
+                  {d.id} <span className="text-slate-500">· {nomUsager(d) ?? d.libelle}</span>
                 </p>
-                <p className="text-xs text-zinc-500">
+                <p className="text-xs text-slate-500">
                   Reçu le {d.dateReception} · {d.nbPages} pages · importé le {new Date(d.importeLe).toLocaleString("fr-FR")}
                 </p>
               </div>
@@ -44,7 +44,7 @@ export function DossiersEnCours() {
               <Link href={cheminEtape(d.id, d.etape)} className="text-sm font-medium text-blue-700 hover:underline dark:text-blue-300">
                 Reprendre
               </Link>
-              <Bouton variante="discret" onClick={() => supprimer(d.id)} className="px-0 py-0 text-sm text-zinc-500">
+              <Bouton variante="discret" onClick={() => supprimer(d.id)} className="px-0 py-0 text-sm text-slate-500">
                 Retirer du poste
               </Bouton>
             </div>

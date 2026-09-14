@@ -98,7 +98,7 @@ export function ImportGed() {
                     <button
                       type="button"
                       onClick={() => setLotId(l.id)}
-                      className={`w-full rounded-md border px-3 py-2 text-left transition ${actif ? "border-blue-500 bg-blue-50 dark:bg-blue-950" : "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"}`}
+                      className={`w-full rounded-md border px-3 py-2 text-left transition ${actif ? "border-blue-500 bg-blue-50 dark:bg-blue-950" : "border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900"}`}
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-medium">{l.libelle}</span>
@@ -106,7 +106,7 @@ export function ImportGed() {
                           {l.dossiers.length} dossier{l.dossiers.length > 1 ? "s" : ""}
                         </Badge>
                       </div>
-                      <p className="mt-0.5 text-xs text-zinc-500">
+                      <p className="mt-0.5 text-xs text-slate-500">
                         {l.date} · {l.source}
                       </p>
                     </button>
@@ -118,20 +118,20 @@ export function ImportGed() {
 
           <Carte titre={lot ? `Dossiers du ${lot.libelle}` : "Dossiers"} sousTitre={lot?.source}>
             {!lot || lot.dossiers.length === 0 ? (
-              <p className="text-sm text-zinc-500">Ce lot ne contient aucun dossier à traiter.</p>
+              <p className="text-sm text-slate-500">Ce lot ne contient aucun dossier à traiter.</p>
             ) : (
               <ul className="flex flex-col gap-3">
                 {lot.dossiers.map((d) => {
                   const enPoste = monte ? dossiersPoste[d.id] : undefined;
                   const enImport = importEnCours?.id === d.id;
                   return (
-                    <li key={d.id} className="rounded-md border border-zinc-200 p-3 dark:border-zinc-800">
+                    <li key={d.id} className="rounded-md border border-slate-200 p-3 dark:border-slate-800">
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div>
                           <p className="font-medium">
-                            {d.id} <span className="text-zinc-500">· {d.libelle}</span>
+                            {d.id} <span className="text-slate-500">· {d.libelle}</span>
                           </p>
-                          <p className="text-xs text-zinc-500">
+                          <p className="text-xs text-slate-500">
                             Reçu le {d.dateReception} · {d.nbPages} pages · {d.tailleKo ? `${(d.tailleKo / 1024).toFixed(1)} Mo` : "PDF non généré"}
                           </p>
                         </div>
@@ -139,8 +139,8 @@ export function ImportGed() {
                       </div>
 
                       <details className="mt-2 text-sm">
-                        <summary className="cursor-pointer text-zinc-600 dark:text-zinc-400">Scénario de démonstration : {d.scenario.titre}</summary>
-                        <ul className="mt-1 list-disc pl-5 text-zinc-600 dark:text-zinc-400">
+                        <summary className="cursor-pointer text-slate-600 dark:text-slate-400">Scénario de démonstration : {d.scenario.titre}</summary>
+                        <ul className="mt-1 list-disc pl-5 text-slate-600 dark:text-slate-400">
                           {d.scenario.attendu.map((a) => (
                             <li key={a}>{a}</li>
                           ))}

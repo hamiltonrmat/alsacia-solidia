@@ -92,11 +92,11 @@ export function EtapeConformite({ id }: { id: string }) {
               <div key={groupe.statut} className="flex flex-col gap-2">
                 <div className="flex items-center gap-2">
                   <Badge teinte={STATUTS[groupe.statut].teinte}>{STATUTS[groupe.statut].libelle}</Badge>
-                  <span className="text-xs text-zinc-500">{groupe.controles.length}</span>
+                  <span className="text-xs text-slate-500">{groupe.controles.length}</span>
                 </div>
                 <ul className="flex flex-col gap-2">
                   {groupe.controles.map((c) => (
-                    <li key={c.id} className="flex gap-3 rounded-md border border-zinc-200 p-3 dark:border-zinc-800">
+                    <li key={c.id} className="flex gap-3 rounded-md border border-slate-200 p-3 dark:border-slate-800">
                       <span
                         className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
                           c.statut === "ok" ? "bg-emerald-600 text-white" : c.statut === "bloquant" ? "bg-red-600 text-white" : c.statut === "alerte" ? "bg-amber-500 text-white" : "bg-sky-500 text-white"
@@ -108,9 +108,9 @@ export function EtapeConformite({ id }: { id: string }) {
                       <div className="min-w-0">
                         <p className="font-medium">
                           {c.libelle}
-                          {c.piece ? <span className="ml-2 text-xs font-normal text-zinc-500">{LIBELLES_PIECES[c.piece]}</span> : null}
+                          {c.piece ? <span className="ml-2 text-xs font-normal text-slate-500">{LIBELLES_PIECES[c.piece]}</span> : null}
                         </p>
-                        <p className="text-sm text-zinc-600 dark:text-zinc-400">{c.detail}</p>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">{c.detail}</p>
                       </div>
                     </li>
                   ))}
@@ -137,21 +137,21 @@ export function EtapeConformite({ id }: { id: string }) {
                     readOnly
                     value={courrierDemandePieces(resultat, nomUsager(dossier))}
                     rows={14}
-                    className="w-full rounded-md border border-zinc-300 bg-white p-3 font-mono text-xs dark:border-zinc-700 dark:bg-zinc-900"
+                    className="w-full rounded-md border border-slate-300 bg-white p-3 font-mono text-xs dark:border-slate-700 dark:bg-slate-900"
                   />
                 ) : null}
               </div>
             ) : (
-              <p className="text-sm text-zinc-500">Toutes les pièces obligatoires sont présentes.</p>
+              <p className="text-sm text-slate-500">Toutes les pièces obligatoires sont présentes.</p>
             )}
           </Carte>
 
           <Carte titre="Pièces du dossier">
             <ul className="flex flex-col gap-1 text-sm">
               {(dossier.pieces ?? []).map((p) => (
-                <li key={p.id} className={`flex items-center justify-between gap-2 ${TYPES_A_ECARTER.includes(p.type) ? "text-zinc-400 line-through" : ""}`}>
+                <li key={p.id} className={`flex items-center justify-between gap-2 ${TYPES_A_ECARTER.includes(p.type) ? "text-slate-400 line-through" : ""}`}>
                   <span>{LIBELLES_PIECES[p.type]}</span>
-                  <span className="text-xs text-zinc-500">p. {p.pages.join(", ")}</span>
+                  <span className="text-xs text-slate-500">p. {p.pages.join(", ")}</span>
                 </li>
               ))}
             </ul>

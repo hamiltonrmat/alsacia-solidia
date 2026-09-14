@@ -103,7 +103,7 @@ export function EtapeExtraction({ id }: { id: string }) {
               key={p.id}
               type="button"
               onClick={() => setPieceActive(p.id)}
-              className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${actif ? "border-blue-600 bg-blue-600 text-white" : "border-zinc-200 bg-white hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"}`}
+              className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${actif ? "border-blue-600 bg-blue-600 text-white" : "border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:hover:bg-slate-900"}`}
             >
               {LIBELLES_PIECES[p.type]} <span className="text-xs opacity-70">(p. {p.pages.join(", ")})</span> {etat}
             </button>
@@ -137,7 +137,7 @@ export function EtapeExtraction({ id }: { id: string }) {
         {extraction?.erreur ? <Alerte teinte="danger" titre="Extraction impossible">{extraction.erreur}</Alerte> : null}
 
         {voirOcr ? (
-          <pre className="mb-4 max-h-80 overflow-auto whitespace-pre-wrap rounded-md border border-zinc-200 bg-zinc-50 p-3 font-mono text-xs dark:border-zinc-800 dark:bg-zinc-900">
+          <pre className="mb-4 max-h-80 overflow-auto whitespace-pre-wrap rounded-md border border-slate-200 bg-slate-50 p-3 font-mono text-xs dark:border-slate-800 dark:bg-slate-900">
             {markdownPiece(dossier, piece.pages)}
           </pre>
         ) : null}
@@ -146,7 +146,7 @@ export function EtapeExtraction({ id }: { id: string }) {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-zinc-200 text-left text-xs uppercase tracking-wide text-zinc-500 dark:border-zinc-800">
+                <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500 dark:border-slate-800">
                   <th className="py-2 pr-3 font-medium">Champ</th>
                   <th className="py-2 pr-3 font-medium">Valeur</th>
                   <th className="py-2 pr-3 font-medium">Confiance</th>
@@ -161,14 +161,14 @@ export function EtapeExtraction({ id }: { id: string }) {
                   const options = optionsChamp(piece.type, c.chemin);
                   const classeLigne = corrige ? "bg-blue-50/60 dark:bg-blue-950/40" : douteux ? "bg-amber-50/70 dark:bg-amber-950/30" : "";
                   return (
-                    <tr key={c.chemin} className={`border-b border-zinc-100 align-top dark:border-zinc-900 ${classeLigne}`}>
-                      <td className="py-1.5 pr-3 text-zinc-700 dark:text-zinc-300">{c.libelle}</td>
+                    <tr key={c.chemin} className={`border-b border-slate-100 align-top dark:border-slate-900 ${classeLigne}`}>
+                      <td className="py-1.5 pr-3 text-slate-700 dark:text-slate-300">{c.libelle}</td>
                       <td className="py-1.5 pr-3">
                         {options ? (
                           <select
                             value={valeurAffichee}
                             onChange={(e) => corrigerChamp(id, piece.id, c.chemin, e.target.value === "" ? null : e.target.value)}
-                            className="w-full min-w-40 rounded border border-zinc-300 bg-white px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                            className="w-full min-w-40 rounded border border-slate-300 bg-white px-2 py-1 text-sm dark:border-slate-700 dark:bg-slate-900"
                             aria-label={c.libelle}
                           >
                             <option value="">— non renseigné —</option>
@@ -184,7 +184,7 @@ export function EtapeExtraction({ id }: { id: string }) {
                             value={valeurAffichee}
                             onChange={(e) => corrigerChamp(id, piece.id, c.chemin, e.target.value === "" ? null : e.target.value)}
                             placeholder="non lu"
-                            className="w-full min-w-40 rounded border border-zinc-300 bg-white px-2 py-1 text-sm placeholder:text-red-400 dark:border-zinc-700 dark:bg-zinc-900"
+                            className="w-full min-w-40 rounded border border-slate-300 bg-white px-2 py-1 text-sm placeholder:text-red-400 dark:border-slate-700 dark:bg-slate-900"
                             aria-label={c.libelle}
                           />
                         )}
@@ -192,7 +192,7 @@ export function EtapeExtraction({ id }: { id: string }) {
                       <td className="py-1.5 pr-3">
                         {corrige ? <Badge teinte="primaire">corrigé</Badge> : <ScoreConfiance valeur={c.confiance} nonLu={c.valeur === null} />}
                       </td>
-                      <td className="max-w-xs py-1.5 font-mono text-xs text-zinc-500">{c.extrait ?? ""}</td>
+                      <td className="max-w-xs py-1.5 font-mono text-xs text-slate-500">{c.extrait ?? ""}</td>
                     </tr>
                   );
                 })}

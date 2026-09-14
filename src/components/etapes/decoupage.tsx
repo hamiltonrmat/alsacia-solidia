@@ -86,10 +86,10 @@ export function EtapeDecoupage({ id }: { id: string }) {
               const ecartee = TYPES_A_ECARTER.includes(piece.type);
               const ouverte = pieceOuverte === piece.id;
               return (
-                <li key={piece.id} className={`rounded-md border p-3 ${ecartee ? "border-dashed border-zinc-300 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900" : "border-zinc-200 dark:border-zinc-800"}`}>
+                <li key={piece.id} className={`rounded-md border p-3 ${ecartee ? "border-dashed border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-900" : "border-slate-200 dark:border-slate-800"}`}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-zinc-500">Document {index + 1}</span>
+                      <span className="text-xs font-semibold text-slate-500">Document {index + 1}</span>
                       <button type="button" onClick={() => setPage(piece.pages[0])} className="text-xs text-blue-700 hover:underline dark:text-blue-300">
                         {plagePages(piece.pages)}
                       </button>
@@ -102,7 +102,7 @@ export function EtapeDecoupage({ id }: { id: string }) {
                   <select
                     value={piece.type}
                     onChange={(e) => changerTypePiece(piece.id, e.target.value as TypePiece)}
-                    className="mt-2 w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                    className="mt-2 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900"
                     aria-label={`Type du document ${index + 1}`}
                   >
                     {TYPES.map((t) => (
@@ -111,11 +111,11 @@ export function EtapeDecoupage({ id }: { id: string }) {
                       </option>
                     ))}
                   </select>
-                  <button type="button" onClick={() => setPieceOuverte(ouverte ? null : piece.id)} className="mt-2 text-xs text-zinc-500 hover:underline">
+                  <button type="button" onClick={() => setPieceOuverte(ouverte ? null : piece.id)} className="mt-2 text-xs text-slate-500 hover:underline">
                     {ouverte ? "Masquer le détail des pages" : `Détail des ${piece.pages.length} page${piece.pages.length > 1 ? "s" : ""}`}
                   </button>
                   {ouverte ? (
-                    <ul className="mt-2 flex flex-col gap-2 border-t border-zinc-200 pt-2 dark:border-zinc-800">
+                    <ul className="mt-2 flex flex-col gap-2 border-t border-slate-200 pt-2 dark:border-slate-800">
                       {piece.pages.map((n) => {
                         const pc = pagesClassees[n - 1];
                         return (
@@ -125,11 +125,11 @@ export function EtapeDecoupage({ id }: { id: string }) {
                                 Page {n}
                               </button>
                               <ScoreConfiance valeur={pc.confiance} />
-                              <span className="text-zinc-500">{pc.justification}</span>
+                              <span className="text-slate-500">{pc.justification}</span>
                               <select
                                 value={pc.type}
                                 onChange={(e) => changerTypePage(n, e.target.value as TypePiece)}
-                                className="ml-auto rounded border border-zinc-300 bg-white px-1 py-0.5 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+                                className="ml-auto rounded border border-slate-300 bg-white px-1 py-0.5 text-xs dark:border-slate-700 dark:bg-slate-900"
                                 aria-label={`Type de la page ${n}`}
                               >
                                 {TYPES.map((t) => (
@@ -139,7 +139,7 @@ export function EtapeDecoupage({ id }: { id: string }) {
                                 ))}
                               </select>
                             </div>
-                            <p className="truncate text-zinc-500">{pc.apercu}</p>
+                            <p className="truncate text-slate-500">{pc.apercu}</p>
                           </li>
                         );
                       })}
