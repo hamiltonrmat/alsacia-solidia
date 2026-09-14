@@ -6,94 +6,123 @@ Règles Next.js 16 pour les agents (régénérées par `next dev`) : @AGENTS.md
 
 ## 1. Contexte
 
-Outil d'aide à l'instruction des dossiers APA (Allocation Personnalisée d'Autonomie) pour la Collectivité européenne d'Alsace. Un dossier reçu (scan ou courrier) est OCRisé, découpé en pièces (CERFA + CNI + certificat médical + ...), ses données sont extraites et hiérarchisées, contrôlées, puis l'outil propose des instructions de décision selon les pièces et les règles métier.
+Outil d'aide à l'instruction des dossiers APA (Allocation Personnalisée d'Autonomie) pour la Collectivité européenne d'Alsace. Un dossier reçu (scan ou courrier) est OCRisé, découpé en pièces (CERFA + CNI + certificat médical + ...), ses données sont extraites et hiérarchisées, contrôlées, puis l'outil propose une orientation selon les pièces et les règles métier, avant export vers le logiciel métier Solis.
 
 Toutes les données manipulées sont **synthétiques**. Le but est la démonstration et l'architecture d'une vraie solution, jamais le traitement de données personnelles réelles.
 
-## 2. Stack de la v2 (décidée le 14/09/2026)
+## 2. Stack (décidée le 14/09/2026)
 
 | Élément | Choix | Notes |
 |---|---|---|
 | Runtime | Node.js 24 LTS via nvm (`~/.nvm`), npm 11 | Hook nvm dans `~/.zprofile`. `~/.zshrc` appartient à root, ne pas y toucher |
-| Framework | Next.js 16.3 (App Router, Turbopack), React 19, TypeScript | Généré par `create-next-app`, dossier `src/`, alias `@/*` |
-| Styles | Tailwind CSS 4 | Design à reprendre de `old_version/styles.css` (polices Outfit / Plus Jakarta Sans) au moment de construire l'UI |
-| OCR | API Mistral `POST /v1/ocr`, modèle `mistral-ocr-latest` | Appel serveur uniquement, via `fetch`, sans SDK. Renvoie du Markdown par page |
+| Framework | Next.js 16.3 (App Router, Turbopack), React 19, TypeScript | Dossier `src/`, alias `@/*` |
+| Styles | Tailwind CSS 4 | Composants maison dans `src/components/ui.tsx` |
+| État client | zustand + `persist` (localStorage, clé `instructocr-dossiers`) | Un dossier importé progresse d'étape en étape dans le navigateur |
+| OCR | API Mistral `POST /v1/ocr`, `mistral-ocr-latest` | Serveur uniquement, `fetch` sans SDK, Markdown par page |
+| Extraction | API Mistral chat, sortie JSON contrainte (`response_format: json_schema`, strict) | `mistral-small-latest` par défaut, surcharge par requête (`modele`) |
+| Génération PDF | pdf-lib (remplissage du CERFA, pièces dessinées) + pdfjs-dist et @napi-rs/canvas (rasterisation) | Dev dependencies, script `tsx` |
 | Hébergement cible | Vercel + GitHub | Pas encore de dépôt distant. Supabase envisagé pour les usagers |
 
-Commandes : `npm run dev` (http://localhost:3000), `npm run build`, `npm run start`, `npm run lint`. Le build fait le type-check TypeScript ; ESLint ne s'exécute plus au build en Next 16, lancer `npm run lint` séparément.
+Commandes : `npm run dev`, `npm run build` (type-check inclus, y compris `scripts/`), `npm run lint` (ESLint 9, règles React 19 : pas de `setState` direct dans un effet), `npm run generer:dossiers`, `npx tsx scripts/tester-pipeline.ts <id> [url] [sortie.json]`.
 
-Dans un shell non interactif (ex. Bash de l'agent), sourcer nvm avant npm : `export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"`.
+Dans un shell non interactif : `export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"` avant npm. Next.js 16 refuse deux `next dev` sur le même projet : si l'utilisateur a lancé le sien (port 3000), tester contre lui.
 
 ## 3. Structure du dépôt
 
 ```
-src/app/layout.tsx            Layout racine (lang fr, métadonnées)
-src/app/page.tsx              Accueil + banc d'essai OCR
-src/app/api/ocr/route.ts      POST multipart { file } → { fileName, model, pages[], usage }
-src/lib/mistral-ocr.ts        Client serveur Mistral OCR (import "server-only")
-src/components/ocr-bench.tsx  Composant client d'upload et d'affichage page par page
-.env.local                    MISTRAL_API_KEY (ignoré par git)   .env.example : modèle
-Formulaire_demande_autonomie_cerfa_16301-01.pdf   CERFA officiel de référence, 13 pages
-old_version/                  Prototype v1 statique, conservé tel quel, exclu d'ESLint
-instructions.md               Brief brut de l'utilisateur
+src/app/page.tsx                       Accueil, dossiers en cours, parcours
+src/app/ged/page.tsx                   Import GED (composant import-ged)
+src/app/dossiers/[id]/layout.tsx       Bandeau du dossier + fil des étapes (404 si id inconnu)
+src/app/dossiers/[id]/{decoupage,extraction,conformite,decision,export}/page.tsx
+src/app/outils/ocr/page.tsx            Banc d'essai OCR (upload libre)
+src/app/api/ged/lots/route.ts          GET : lots et dossiers de la GED simulée
+src/app/api/dossiers/[id]/ocr/route.ts POST : lit public/ged/<lot>/<id>.pdf, OCR Mistral
+src/app/api/extraction/route.ts        POST { type, markdown, modele? } : extraction structurée
+src/app/api/solis/route.ts             POST { action: rechercher | exporter } : Solis simulé
+src/app/api/ocr/route.ts               POST multipart { file } : OCR d'un fichier envoyé
+src/components/etapes/*.tsx            Les cinq étapes du poste de travail (client)
+src/components/{ui,en-tete,en-tete-dossier,import-ged,visionneuse-pdf,dossiers-en-cours,ocr-bench}.tsx
+src/lib/mistral-ocr.ts                 Client OCR (server-only)
+src/lib/decoupage.ts                   Classification des pages par règles, regroupement en pièces
+src/lib/extraction/schemas.ts          Schémas JSON par type de pièce, libellés, aplatissement
+src/lib/extraction/mistral-extraction.ts  Prompt, appel chat, post-traitement IBAN/NIR (server-only)
+src/lib/regles/conformite.ts           Phase 2 : contrôles, recevabilité, courrier de pièces
+src/lib/regles/decision.ts             Phase 3 : règles, orientation, GIR estimé, PARAMETRES
+src/lib/{dates,identifiants,dossier-utils}.ts
+src/store/dossier-store.ts             État des dossiers (zustand persist), valeurEffective
+src/data/types.ts                      Modèle d'un dossier fictif
+src/data/dossiers-fictifs.ts           6 usagers fictifs, 3 lots, scénarios attendus
+src/data/solis.ts                      Base Solis simulée, recherche par NIR puis état civil
+scripts/generer-dossiers.ts            Génère public/ged/**/*.pdf (voir section 5)
+scripts/tester-pipeline.ts             Test de bout en bout en CLI
+public/ged/<lot>/<id>.pdf              Dossiers fictifs « numérisés » (13 Mo, versionnés)
+Formulaire_demande_autonomie_cerfa_16301-01.pdf   CERFA officiel, 13 pages, AcroForm de 294 champs
+old_version/                           Prototype v1 statique, exclu d'ESLint, ne pas modifier
+instructions.md                        Brief brut de l'utilisateur
 ```
 
-Git est initialisé en local (branche `main`). Aucune identité git n'est configurée sur la machine (`user.name` / `user.email` absents) : ne pas modifier la config, passer `-c user.name=... -c user.email=...` au commit ou demander à l'utilisateur de la configurer.
+Git : dépôt local, branche `main`, pas de remote. Aucune identité git sur la machine : passer `-c user.name=hamiltonrmat -c user.email=hamiltonrmat@gmail.com` au commit. Messages de commit en français.
 
-## 4. Le CERFA 16301*01 (référence pour l'extraction)
+## 4. Le CERFA 16301*01
 
-Vérifié par OCR Mistral le 14/09/2026 : 13 pages, toutes bien reconnues.
+13 pages : 1 à 4 notice (page 4 = pièces justificatives), 5 à 9 formulaire, 10 mentions RGPD, 11 à 13 annexe certificat médical. Le pied de page « cerfa 16301*01 / n / 09/2023 » donne le numéro officiel de chaque page : c'est la clé du découpage.
 
-| Pages | Contenu | Utilité pour l'outil |
+Le PDF est un formulaire remplissable dont les champs ont des noms génériques (« Champ de texte 185 », « Case d'option 7 »). Le générateur les désigne par page et position (y depuis le haut, x si ambigu), relevées une fois pour toutes ; les cases de dates, NIR, téléphone et code postal sont des séries de champs à un caractère. Les boutons radio ont des états `/0`, `/1`... par option, mais on ne passe pas par le formulaire pour les cocher : on dessine.
+
+Pièces obligatoires pour l'APA : justificatif d'identité, RIB, dernier avis d'imposition (demandeur et conjoint), certificat médical facultatif. Si concerné : décision de justice (mesure de protection), avis de taxe foncière (bien non loué).
+
+Condition d'âge de l'APA : **60 ans et plus** (CERFA). La v1 évoquait 50 ans comme dérogation ; `PARAMETRES.ageMinimumApa` vaut 60, à valider avec l'utilisateur.
+
+## 5. Génération des dossiers fictifs et comportement de l'OCR
+
+`npm run generer:dossiers` : remplit le CERFA (pdf-lib, aplatissement), dessine CNI, RIB, avis d'imposition, jugement sur des pages A4, assemble dans l'ordre de « numérisation » du dossier, puis **rasterise** chaque page (150 dpi, JPEG q70) pour obtenir un vrai scan. Variables : `VECTORIEL=1`, `DPI_SCAN`, `QUALITE_JPEG`, `STYLE_MARQUE=x|zapf`, `TAILLE_MARQUE`, `CONTOUR_CASES=0|1`, `DOSSIERS=D-2026-0305,...`, `SORTIE_DIR`.
+
+Enseignements mesurés le 14/09/2026 sur la lecture des cases à cocher par `mistral-ocr-latest` (déterministe d'une lecture à l'autre) :
+
+- Le rendu retenu est **croix ZapfDingbats (✘, 8 pt) + contour explicite de toutes les cases + rasterisation**. Il est le seul à faire lire la page 7 du formulaire (civilité du proche, lien, questionnaire d'autonomie, prestations) et la grille du certificat médical.
+- Le glyphe « X » gras lit mieux la partie 6 (propriétaire / occupation) mais perd la page 7. Les tracés vectoriels (traits, carré plein, coche) sont les moins bien lus.
+- Sur certaines lignes (partie 6 « Propriétaire », « Non louée », CMI partie 7), la **case cochée disparaît** de la lecture alors que les cases vides restent (□). Le prompt d'extraction décrit cette heuristique (option sans symbole parmi des □ = cochée, confiance 0,6). `mistral-small-latest` ne l'applique pas toujours et peut inventer un ☑ dans `extrait`.
+- L'annotation structurée de l'API OCR (`document_annotation_format`, modèle de vision) hallucine des valeurs plausibles quand une case est illisible : écartée.
+- Les longues suites de chiffres peuvent perdre un chiffre à l'extraction : IBAN et NIR sont relus par expression régulière dans le Markdown et vérifiés par leur clé (`postTraitement`). Les dates en cases « 2 0 0 7 2 0 2 6 » doivent être lues JJ MM AAAA (règle explicite dans le prompt).
+- Les champs non lus sont le fonctionnement normal du pré-contrôle : l'agent complète. Ne pas chercher à tout automatiser.
+
+## 6. Scénarios de démonstration (src/data/dossiers-fictifs.ts)
+
+| Dossier | Usager | Ce que la démo montre |
 |---|---|---|
-| 1 à 4 | Notice explicative | Page 4 = liste des pièces justificatives obligatoires (base des règles de recevabilité) |
-| 5 à 9 | Formulaire à remplir | Champs à extraire, voir ci-dessous |
-| 10 | Mentions RGPD | Aucune donnée |
-| 11 à 13 | Annexe : certificat médical | Pièce distincte à détecter et découper |
+| D-2026-0301 | Jean DUPONT, 78 ans | Complet et conforme, 3 « non » → APA, usager connu de Solis (APA 2019) → rattachement |
+| D-2026-0302 | Marie MEYER ép. LEROY, 83 ans | RIB absent → non recevable, avis commun (2 parts) |
+| D-2026-0303 | Paul MARTIN, 58 ans | Condition d'âge non remplie → MDPH, PCH perçue (non-cumul) |
+| D-2026-0304 | Simone BERNARD, 75 ans | 16 pages avec notice, RGPD et CM vierge écartés ; 4 « oui » → caisse de retraite |
+| D-2026-0305 | Robert MOREAU, 86 ans | CNI en tête, CM en fin ; tutelle, signature de la tutrice, jugement absent → bloquant ; taxe foncière |
+| D-2026-0306 | Hélène GARNIER ép. PETIT, 80 ans | CNI expirée (règle +5 ans), date de naissance incohérente CERFA/CNI, déménagement récent |
 
-Sections du formulaire : cadre administration (n° dossier, date de réception) ; 1 situation du demandeur (identité, NSS 15 chiffres, caisse de retraite, coordonnées, type de domicile, ancien lieu de résidence) ; situation familiale et conjoint ; 2 mesure de protection ; 3 personne proche à contacter ; 4 identification de l'organisme compétent (4 questions oui/non, 2 « non » ou plus = APA département, sinon caisse de retraite) ; 5 autres prestations (ACTP, PCH, MTP, ...) ; 6 ressources et patrimoine ; 7 demande de CMI ; 8 signature.
+Résultats vérifiés par `scripts/tester-pipeline.ts` le 14/09/2026 : 0301, 0304, 0305, 0306 conformes aux attentes, à l'exception de la CMI (jamais lue) et, selon le modèle, de l'occupation du logement.
 
-Pièces obligatoires pour l'APA (page 4) : justificatif d'identité, RIB, dernier avis d'imposition du demandeur et du conjoint, certificat médical (facultatif, sous pli cacheté). Si concerné : décision de justice de mise sous protection, avis de taxe foncière.
+## 7. Workflow métier (3 phases)
 
-Règle de la v1 à réconcilier : la v1 évoquait « autonomie de niveau 1 réservée aux 50 ans et plus ». Le CERFA réel fixe la condition d'âge de l'APA à **60 ans et plus**. Valider avec l'utilisateur avant d'implémenter les règles de décision.
+1. **Découpage et extraction** (`decoupage.ts`, `extraction/`). Score de confiance par pièce, page et champ. L'agent contrôle, complète et valide.
+2. **Conformité et recevabilité** (`regles/conformite.ts`). Statuts `ok | info | alerte | bloquant`. Un bloquant rend le dossier non recevable ; une alerte le rend recevable sous réserve. Courrier de demande de pièces généré.
+3. **Aide à la décision** (`regles/decision.ts`). Orientation `instruction_apa | caisse_retraite | mdph | pieces_manquantes | indeterminee`. GIR estimé indicatif à partir de la grille du certificat médical. L'agent retient l'orientation finale et commente.
 
-## 5. `old_version/` — prototype v1
-
-Application 100 % front, HTML/CSS/JS vanilla, sans build. Tout l'état est codé en dur dans `app.js` (lots, dossiers, champs OCR, conformité). SPA à 5 onglets : Chargement, Découpage, Pré-contrôle, Conformité, Aide à Décision. `dossier_apa.html` est un faux dossier converti en PDF par `generate_pdf.ps1` (Windows uniquement). `dossier_apa_extrait.md` simule une extraction OCR imparfaite. `OCR - Workflow Outil.md` est la spécification métier des 3 phases.
-
-Hiérarchie de données : **Lot** de numérisation → **Dossier** usager → **Pièces** (`cerfa`, `cni`, `cm`) → **Champs** avec score de confiance.
-
-## 6. Workflow métier (3 phases)
-
-1. **Découpage et extraction.** Un dossier devient un CERFA suivi de ses pièces justificatives. Pour chaque type de pièce, un schéma d'extraction déclare les champs à récupérer. Score OCR par lot, dossier, document, page et champ. L'agent contrôle, complète et valide.
-2. **Conformité et recevabilité.** Contrôle intrinsèque de chaque pièce (CNI du demandeur, validité), puis vérification des pièces obligatoires selon le type de demande. Prévoir plusieurs niveaux de contrôle pour qu'une erreur OCR mineure ne bloque pas un dossier presque conforme.
-3. **Aide à la décision.** Application des règles métier sur un dossier recevable. L'expertise métier appartient à l'utilisateur.
-
-## 7. Objectifs de la v2 (résumé de `instructions.md`)
-
-- Application **réellement fonctionnelle**, OCR par l'API Mistral. Fait : clé fournie et validée, endpoint `/api/ocr` opérationnel.
-- Générer des **dossiers usagers fictifs en PDF** à partir du CERFA 16301-01, avec des cas intéressants (pièces manquantes, données ambiguës, âges limites, doublons).
-- Page **Import** simulant une **GED** fictive listant les dossiers à traiter.
-- Page finale **Export** simulant le logiciel métier **Solis** : création de l'usager si première demande, sinon rattachement du dossier à l'usager existant.
-- Déploiement Vercel + GitHub, Supabase envisagé pour la persistance des usagers.
+L'expertise métier appartient à l'utilisateur : les règles sont un premier jeu à affiner avec lui.
 
 ## 8. Règles de travail
 
-- **Langue** : UI, documentation, commentaires et messages de commit en français.
-- **Secrets** : jamais de clé dans le code ni dans le dépôt. `MISTRAL_API_KEY` dans `.env.local`, jamais préfixée `NEXT_PUBLIC_`. Tout appel Mistral passe par `src/lib/mistral-ocr.ts` côté serveur.
-- **Données** : uniquement des données fictives, y compris fixtures et captures.
-- **Next.js 16** : lire `node_modules/next/dist/docs/` avant d'utiliser une API dont on n'est pas sûr, les conventions ont changé (voir AGENTS.md).
-- **Limite Vercel** : le corps d'une requête vers une fonction est plafonné à 4,5 Mo. Pour les dossiers scannés volumineux, prévoir un stockage (Supabase Storage ou Vercel Blob) et passer une URL à Mistral (`document_url` https) au lieu d'un base64.
-- **Génération de PDF** : `generate_pdf.ps1` ne fonctionne pas sur macOS. Prévoir une méthode multiplateforme (bibliothèque JS de génération PDF ou impression headless Chromium).
-- **Outils absents** : Homebrew et `pdftotext` ne sont pas installés. Python 3.9 système disponible.
+- **Langue** : UI, documentation, commentaires et commits en français.
+- **Secrets** : `MISTRAL_API_KEY` dans `.env.local`, jamais préfixée `NEXT_PUBLIC_`, jamais affichée. Tout appel Mistral passe par `src/lib/mistral-ocr.ts` ou `src/lib/extraction/mistral-extraction.ts` (server-only).
+- **Données** : uniquement fictives. Les NIR et IBAN fictifs ont une clé valide mais ne correspondent à personne.
+- **Next.js 16** : lire `node_modules/next/dist/docs/` avant d'utiliser une API dont on n'est pas sûr. `LayoutProps`, `PageProps`, `RouteContext` sont des helpers globaux ; `params` est une promesse.
+- **Vercel** : corps de requête plafonné à 4,5 Mo ; les PDF de la GED sont lus sur disque par la route d'OCR (`outputFileTracingIncludes` dans `next.config.ts`). Pour de vrais dossiers, prévoir un stockage et passer une URL à Mistral.
+- **Outils absents** : Homebrew, `pdftotext`, Ghostscript. La rasterisation se fait en Node (pdfjs-dist + @napi-rs/canvas).
 
 ## 9. Glossaire
 
-- **APA** : Allocation Personnalisée d'Autonomie. **CERFA** : formulaire administratif normalisé. **NIR / NSS** : numéro de sécurité sociale, 15 chiffres. **CNI** : carte nationale d'identité. **CMI** : carte mobilité inclusion. **GED** : gestion électronique des documents. **Solis** : logiciel métier cible de l'export. **EMS** : équipe médico-sociale.
+APA (Allocation Personnalisée d'Autonomie), CERFA, NIR / NSS (15 chiffres), CNI, CMI (carte mobilité inclusion), GIR (groupe iso-ressources, 1 à 6), EMS (équipe médico-sociale), GED, Solis (logiciel métier), MDPH, PCH, ACTP, MTP, PCRTP (prestations non cumulables avec l'APA).
 
 ## 10. Prochaines étapes
 
-1. Construire le workflow complet dans l'app (import GED → découpage → extraction → conformité → décision → export Solis) en reprenant l'ergonomie des 5 onglets de la v1.
-2. Définir le schéma d'extraction du CERFA (sections 1 à 8) et des pièces jointes, puis l'extraction structurée à partir du Markdown OCR (règles ou modèle Mistral en aval de l'OCR).
-3. Produire un jeu de dossiers fictifs en PDF couvrant les cas de test.
-4. Créer le dépôt GitHub, brancher Vercel, décider de Supabase.
+1. Faire valider par l'utilisateur les règles de conformité et de décision, et les paramètres (`PARAMETRES`).
+2. Choisir le modèle d'extraction du CERFA (small vs medium) selon le compromis coût / fiabilité des cases.
+3. Créer le dépôt GitHub, brancher Vercel ; décider de Supabase pour remplacer le localStorage.
+4. Pistes : persistance serveur des dossiers, journal des actions de l'agent, génération de PDF de courrier, dégradations de scan (inclinaison, bruit).
