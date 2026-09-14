@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Dossier APA - Exemple d'Entrée</title>
+<style>
+  body {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #ffffff;
+    color: #333333;
+    font-size: 12px;
+  }
+  .page {
+    width: 210mm;
+    height: 297mm;
+    padding: 20mm;
+    box-sizing: border-box;
+    page-break-after: always;
+    position: relative;
+    background: #ffffff;
+  }
+  
+  /* Titres et en-têtes */
+  .cerfa-logo {
+    display: inline-block;
+    border: 2px solid #000;
+    padding: 5px 10px;
+    font-weight: bold;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+  }
+  .cerfa-num {
+    float: right;
+    text-align: right;
+    font-weight: bold;
+  }
+  .cerfa-header {
+    border-bottom: 2px solid #000;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+  }
+  .cerfa-title {
+    text-align: center;
+    font-size: 18px;
+    font-weight: bold;
+    margin: 30px 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    line-height: 1.4;
+  }
+  .section-title {
+    background-color: #f2f2f2;
+    padding: 6px 10px;
+    font-weight: bold;
+    font-size: 11px;
+    text-transform: uppercase;
+    margin-top: 20px;
+    margin-bottom: 12px;
+    border-left: 4px solid #000;
+  }
+  
+  /* Lignes de formulaire */
+  .form-row {
+    display: flex;
+    margin-bottom: 12px;
+    align-items: flex-end;
+  }
+  .form-label {
+    font-weight: bold;
+    width: 220px;
+    color: #444;
+  }
+  .form-value {
+    border-bottom: 1px dotted #666;
+    flex-grow: 1;
+    padding-bottom: 2px;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 13px;
+    font-weight: bold;
+  }
+  .checkbox-group {
+    display: flex;
+    gap: 15px;
+    margin-left: 20px;
+  }
+  .checkbox {
+    border: 1px solid #000;
+    width: 12px;
+    height: 12px;
+    display: inline-block;
+    text-align: center;
+    line-height: 10px;
+    font-weight: bold;
+    margin-right: 5px;
+  }
+  .footer-page {
+    position: absolute;
+    bottom: 20mm;
+    left: 20mm;
+    right: 20mm;
+    border-top: 1px solid #ccc;
+    padding-top: 5px;
+    color: #777;
+    font-size: 9px;
+    display: flex;
+    justify-content: space-between;
+  }
+  
+  /* CNI Styles */
+  .cni-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 80%;
+  }
+  .cni-card {
+    border: 3px double #002244;
+    background: linear-gradient(135deg, #f0f5fa 0%, #dbe7f5 100%);
+    width: 105mm;
+    height: 74mm;
+    padding: 15px;
+    box-sizing: border-box;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  }
+  .cni-header {
+    text-align: center;
+    border-bottom: 1.5px solid #002244;
+    padding-bottom: 5px;
+    margin-bottom: 15px;
+    color: #002244;
+  }
+  .cni-header-title {
+    font-weight: bold;
+    font-size: 11px;
+    text-transform: uppercase;
+  }
+  .cni-body {
+    display: flex;
+    gap: 15px;
+  }
+  .cni-photo {
+    width: 28mm;
+    height: 35mm;
+    border: 1px solid #888;
+    background: #e2e8f0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 9px;
+    color: #666;
+    font-weight: bold;
+  }
+  .cni-fields {
+    flex-grow: 1;
+    font-size: 9px;
+  }
+  .cni-row {
+    margin-bottom: 6px;
+  }
+  .cni-label {
+    font-weight: bold;
+    color: #555;
+    text-transform: uppercase;
+    font-size: 8px;
+  }
+  .cni-value {
+    font-weight: bold;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 11px;
+    color: #111;
+  }
+  
+  /* Medical Certificate Styles */
+  .mc-container {
+    padding: 10mm;
+    border: 1px solid #ccc;
+    background: #fafafa;
+    min-height: 70%;
+  }
+  .mc-header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+  .mc-doctor {
+    font-weight: bold;
+    font-size: 14px;
+    margin-bottom: 5px;
+  }
+  .mc-title {
+    font-size: 18px;
+    font-weight: bold;
+    text-decoration: underline;
+    margin: 30px 0;
+  }
+  .mc-text {
+    font-size: 13px;
+    line-height: 1.8;
+    margin-bottom: 40px;
+  }
+  .mc-signature {
+    text-align: right;
+    margin-top: 50px;
+    padding-right: 20px;
+  }
+</style>
+</head>
+<body>
+
+  <!-- PAGE 1: CERFA Demande d'APA - Page 1 -->
+  <div class="page">
+    <div class="cerfa-header">
+      <div class="cerfa-logo">RÉPUBLIQUE FRANÇAISE</div>
+      <div class="cerfa-num">
+        CERFA n° 12101*02<br>
+        <span style="font-size: 10px; font-weight: normal;">Département du Bas-Rhin</span>
+      </div>
+      <div style="clear:both;"></div>
+    </div>
+    
+    <div class="cerfa-title">
+      DEMANDE D'ALLOCATION PERSONNALISÉE D'AUTONOMIE (APA)<br>
+      <span style="font-size: 12px; font-weight: normal;">(Article L. 232-1 et suivants du code de l'action sociale et des familles)</span>
+    </div>
+    
+    <div class="section-title">1. Situation du demandeur</div>
+    
+    <div class="form-row">
+      <div class="form-label">Votre Sexe :</div>
+      <div class="checkbox-group">
+        <div><span class="checkbox"></span>Madame</div>
+        <div><span class="checkbox">X</span>Monsieur</div>
+      </div>
+    </div>
+    
+    <div class="form-row">
+      <div class="form-label">Nom de naissance :</div>
+      <div class="form-value">D_PO_T</div>
+    </div>
+    
+    <div class="form-row">
+      <div class="form-label">Nom d'usage (si différent) :</div>
+      <div class="form-value"></div>
+    </div>
+    
+    <div class="form-row">
+      <div class="form-label">Prénom(s) :</div>
+      <div class="form-value">Jean</div>
+    </div>
+    
+    <div class="form-row">
+      <div class="form-label">Date de naissance :</div>
+      <div class="form-value">12 / 07 / 1951</div>
+    </div>
+    
+    <div class="form-row">
+      <div class="form-label">Numéro d'inscription au répertoire (NIR) :</div>
+      <div class="form-value">1 51 07 67 012 345</div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-label">Nationalité :</div>
+      <div class="checkbox-group">
+        <div><span class="checkbox">X</span>Française</div>
+        <div><span class="checkbox"></span>Autre</div>
+      </div>
+    </div>
+    
+    <div class="footer-page">
+      <span>Dossier APA - Cerfa 12101*02</span>
+      <span>Page 1/6</span>
+    </div>
+  </div>
+
+  <!-- PAGE 2: CERFA Demande d'APA - Page 2 -->
+  <div class="page">
+    <div class="cerfa-header">
+      <div class="cerfa-logo">RÉPUBLIQUE FRANÇAISE</div>
+      <div class="cerfa-num">CERFA n° 12101*02</div>
+      <div style="clear:both;"></div>
+    </div>
+    
+    <div class="section-title">2. Coordonnées du demandeur</div>
+    
+    <div class="form-row">
+      <div class="form-label">Adresse :</div>
+      <div class="form-value">12 Rue de la Paix</div>
+    </div>
+    
+    <div class="form-row">
+      <div class="form-label">Code postal :</div>
+      <div class="form-value">67000</div>
+    </div>
+    
+    <div class="form-row">
+      <div class="form-label">Commune :</div>
+      <div class="form-value">Strasbourg</div>
+    </div>
+    
+    <div class="form-row">
+      <div class="form-label">Téléphone :</div>
+      <div class="form-value">03 88 12 34 56</div>
+    </div>
+    
+    <div class="form-row">
+      <div class="form-label">Courriel :</div>
+      <div class="form-value">jean.dupont@email.fr</div>
+    </div>
+    
+    <div class="section-title">3. Situation familiale</div>
+    <div class="form-row">
+      <div class="form-label">Vie de couple :</div>
+      <div class="checkbox-group">
+        <div><span class="checkbox">X</span>Célibataire / veuf / divorcé</div>
+        <div><span class="checkbox"></span>Marié / Pacsé / Concubinage</div>
+      </div>
+    </div>
+    
+    <div class="footer-page">
+      <span>Dossier APA - Cerfa 12101*02</span>
+      <span>Page 2/6</span>
+    </div>
+  </div>
+
+  <!-- PAGE 3: CERFA Demande d'APA - Page 3 -->
+  <div class="page">
+    <div class="cerfa-header">
+      <div class="cerfa-logo">RÉPUBLIQUE FRANÇAISE</div>
+      <div class="cerfa-num">CERFA n° 12101*02</div>
+      <div style="clear:both;"></div>
+    </div>
+    
+    <div class="section-title">4. Déclaration de ressources</div>
+    
+    <p style="margin-bottom: 15px; line-height: 1.5;">Veuillez indiquer vos ressources annuelles nettes pour l'année de référence :</p>
+    
+    <div class="form-row">
+      <div class="form-label">Pensions de retraite régimes de base :</div>
+      <div class="form-value">14 250 €</div>
+    </div>
+    
+    <div class="form-row">
+      <div class="form-label">Retraites complémentaires :</div>
+      <div class="form-value">3 800 €</div>
+    </div>
+    
+    <div class="form-row">
+      <div class="form-label">Revenus mobiliers / immobiliers :</div>
+      <div class="form-value">120 €</div>
+    </div>
+    
+    <div class="form-row">
+      <div class="form-label">Autre ressources :</div>
+      <div class="form-value">0 €</div>
+    </div>
+    
+    <div class="footer-page">
+      <span>Dossier APA - Cerfa 12101*02</span>
+      <span>Page 3/6</span>
+    </div>
+  </div>
+
+  <!-- PAGE 4: CERFA Demande d'APA - Page 4 -->
+  <div class="page">
+    <div class="cerfa-header">
+      <div class="cerfa-logo">RÉPUBLIQUE FRANÇAISE</div>
+      <div class="cerfa-num">CERFA n° 12101*02</div>
+      <div style="clear:both;"></div>
+    </div>
+    
+    <div class="section-title">5. Signature et engagement</div>
+    
+    <p style="line-height: 1.6; text-align: justify; margin-bottom: 30px;">
+      Je certifie sur l'honneur l'exactitude de tous les renseignements portés sur cette demande et j'autorise les services du Conseil Départemental à procéder à toutes vérifications auprès des organismes débiteurs de prestations familiales ou de retraite.<br><br>
+      Fait à <strong>Strasbourg</strong>, le <strong>20 juin 2026</strong>.
+    </p>
+    
+    <div style="display: flex; justify-content: space-between; margin-top: 50px;">
+      <div style="width: 200px;">
+        <strong>Signature du demandeur :</strong>
+        <div style="border: 1px solid #ccc; height: 80px; margin-top: 10px; padding: 10px; font-family: 'Courier New'; font-style: italic;">
+          Jean Dupont
+        </div>
+      </div>
+      <div style="width: 200px;">
+        <strong>Signature du représentant (si applicable) :</strong>
+        <div style="border: 1px dashed #ccc; height: 80px; margin-top: 10px;"></div>
+      </div>
+    </div>
+    
+    <div class="footer-page">
+      <span>Dossier APA - Cerfa 12101*02</span>
+      <span>Page 4/6</span>
+    </div>
+  </div>
+
+  <!-- PAGE 5: Justificatif - Carte Nationale d'Identité (CNI) -->
+  <div class="page">
+    <div class="cerfa-header">
+      <div class="cerfa-logo">PIÈCE JUSTIFICATIVE D'IDENTITÉ</div>
+      <div class="cerfa-num">Page 5/6</div>
+      <div style="clear:both;"></div>
+    </div>
+    
+    <div class="cni-container">
+      <div class="cni-card">
+        <div class="cni-header">
+          <div class="cni-header-title">RÉPUBLIQUE FRANÇAISE</div>
+          <div style="font-size: 8px;">CARTE NATIONALE D'IDENTITÉ / NATIONAL IDENTITY CARD</div>
+        </div>
+        
+        <div class="cni-body">
+          <div class="cni-photo">
+            [ PHOTO MAELYS ]
+          </div>
+          <div class="cni-fields">
+            <div class="cni-row">
+              <span class="cni-label">Nom / Surname</span><br>
+              <span class="cni-value">MARTIN</span>
+            </div>
+            
+            <div class="cni-row">
+              <span class="cni-label">Prénoms / Given names</span><br>
+              <span class="cni-value">Maëlys Clara</span>
+            </div>
+            
+            <div class="cni-row">
+              <span class="cni-label">Sexe / Sex</span><br>
+              <span class="cni-value">F</span>
+            </div>
+            
+            <div class="cni-row">
+              <span class="cni-label">Né(e) le / Date of birth</span><br>
+              <span class="cni-value">13.07.1990</span>
+            </div>
+            
+            <div class="cni-row">
+              <span class="cni-label">Lieu de naissance / Place of birth</span><br>
+              <span class="cni-value">Paris (75)</span>
+            </div>
+
+            <div class="cni-row">
+              <span class="cni-label">Date d'expiration / Expiry date</span><br>
+              <span class="cni-value" style="color: red;">15.09.2024</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="footer-page">
+      <span>Dossier APA - Pièce Justificative 1</span>
+      <span>Page 5/6</span>
+    </div>
+  </div>
+
+  <!-- PAGE 6: Certificat Médical -->
+  <div class="page">
+    <div class="cerfa-header">
+      <div class="cerfa-logo">PIÈCE JUSTIFICATIVE MÉDICALE</div>
+      <div class="cerfa-num">Page 6/6</div>
+      <div style="clear:both;"></div>
+    </div>
+    
+    <div class="mc-container">
+      <div class="mc-header">
+        <div class="mc-doctor">Dr. Jean-Pierre MARTIN</div>
+        <div>Médecin Généraliste</div>
+        <div>3 Boulevard de l'Orangerie, 67000 Strasbourg</div>
+        <div>Tél : 03 88 99 99 99</div>
+      </div>
+      
+      <div class="mc-title" style="text-align: center;">CERTIFICAT MÉDICAL</div>
+      
+      <div class="mc-text">
+        Je soussigné, Dr. Jean-Pierre MARTIN, certifie avoir examiné ce jour :<br><br>
+        <strong>Monsieur Jean DUPONT</strong><br>
+        Né le <strong>12 juillet 1951</strong><br>
+        Demeurant au 12 Rue de la Paix, 67000 Strasbourg.<br><br>
+        
+        Je constate que l'état de santé de ce patient présente une perte d'autonomie significative liée à des troubles locomoteurs sévères et des difficultés cognitives naissantes.<br><br>
+        Cet état de dépendance correspond à une évaluation clinique de niveau <strong>GIR 2</strong> sur la grille AGGIR, nécessitant l'assistance d'une tierce personne au quotidien pour les actes essentiels de la vie.<br><br>
+        Certificat établi pour faire valoir ce que de droit.
+      </div>
+      
+      <div class="mc-signature">
+        Fait à Strasbourg, le 15 juin 2026.<br><br>
+        <strong style="font-family: 'Courier New'; font-style: italic;">Signature et Cachet du Médecin :</strong><br>
+        <span style="font-family: 'Courier New'; font-size: 14px; font-weight: bold; border: 1px solid #333; padding: 5px; display: inline-block; margin-top: 10px;">Dr. J-P. Martin</span>
+      </div>
+    </div>
+    
+    <div class="footer-page">
+      <span>Dossier APA - Pièce Justificative 2</span>
+      <span>Page 6/6</span>
+    </div>
+  </div>
+
+</body>
+</html>
