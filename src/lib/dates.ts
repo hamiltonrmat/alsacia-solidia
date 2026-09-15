@@ -52,3 +52,16 @@ export function moisEntre(debut: Date, fin: Date): number {
 export function ajouterAnnees(date: Date, annees: number): Date {
   return new Date(Date.UTC(date.getUTCFullYear() + annees, date.getUTCMonth(), date.getUTCDate()));
 }
+
+export function ajouterMois(date: Date, mois: number): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + mois, date.getUTCDate()));
+}
+
+export function ajouterJours(date: Date, jours: number): Date {
+  return new Date(date.getTime() + jours * 86_400_000);
+}
+
+/** Nombre de jours entiers entre deux dates (positif si `fin` est après `debut`). */
+export function joursEntre(debut: Date, fin: Date): number {
+  return Math.floor((fin.getTime() - debut.getTime()) / 86_400_000);
+}

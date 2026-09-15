@@ -2,7 +2,7 @@ import "server-only";
 
 import type { TypePiece } from "@/lib/decoupage";
 import { chiffres, ibanValide, nirValide } from "@/lib/identifiants";
-import { SCHEMAS_PAR_TYPE, type ChampExtrait } from "./schemas";
+import { optionsChamp, SCHEMAS_PAR_TYPE, type ChampExtrait } from "./schemas";
 
 /**
  * Extraction structurée des champs d'une pièce à partir de son texte OCR,
@@ -71,16 +71,27 @@ function lireChampBrut(champs: Record<string, unknown>, chemin: string): ChampEx
 const SYMBOLES_COCHES = /[☒☑■✕✗]/;
 const SYMBOLES_VIDES = /[☐□]/;
 
-/** Parcourt tous les champs feuilles d'un résultat d'extraction. */
-function pourChaqueChamp(objet: unknown, visiteur: (champ: ChampExtrait) => void): void {
+const SYMBOLES_CASES = /[☒☑■✕✗☐□]/;
+
+/** Parcourt tous les champs feuilles d'un résultat d'extraction, avec leur chemin. */
+function pourChaqueChamp(objet: unknown, visiteur: (champ: ChampExtrait, chemin: string) => void, prefixe = ""): void {
   if (typeof objet !== "object" || objet === null) return;
-  for (const valeur of Object.values(objet as Record<string, unknown>)) {
+  for (const [cle, valeur] of Object.entries(objet as Record<string, unknown>)) {
+    const chemin = prefixe ? `${prefixe}.${cle}` : cle;
     if (typeof valeur === "object" && valeur !== null && "valeur" in valeur && "confiance" in valeur) {
-      visiteur(valeur as ChampExtrait);
+      visiteur(valeur as ChampExtrait, chemin);
     } else {
-      pourChaqueChamp(valeur, visiteur);
+      pourChaqueChamp(valeur, visiteur, chemin);
     }
   }
+}
+
+/** Ligne du texte OCR d'où provient un extrait (recherche souple sur ses 30 premiers caractères). */
+function ligneSource(markdown: string, extrait: string | null): string | null {
+  if (!extrait) return null;
+  const cle = normaliserLigne(extrait.replace(/[☒☑■✕✗☐□]/g, "").trim()).slice(0, 30);
+  if (cle.length < 6) return null;
+  return markdown.split("\n").find((l) => normaliserLigne(l).includes(cle)) ?? null;
 }
 
 /**
@@ -134,14 +145,25 @@ function optionSansCase(markdown: string, options: Record<string, string>): stri
  */
 export function postTraitement(type: TypePiece, champs: Record<string, unknown>, markdown: string): void {
   const texteACoches = SYMBOLES_COCHES.test(markdown);
-  pourChaqueChamp(champs, (champ) => {
+  pourChaqueChamp(champs, (champ, chemin) => {
+    // 1. Un symbole de case cochée cité dans l'extrait mais absent du texte : valeur inventée.
     if (champ.extrait && SYMBOLES_COCHES.test(champ.extrait)) {
-      const extraitSansSymbole = champ.extrait.replace(/[☒☑■✕✗☐□]/g, "").trim();
-      const ligne = markdown.split("\n").find((l) => extraitSansSymbole && normaliserLigne(l).includes(normaliserLigne(extraitSansSymbole).slice(0, 30)));
+      const ligne = ligneSource(markdown, champ.extrait);
       const symboleReel = ligne ? SYMBOLES_COCHES.test(ligne) : texteACoches;
       if (!symboleReel) {
         champ.confiance = Math.min(champ.confiance, 0.3);
-        champ.extrait = `${extraitSansSymbole} (case cochée non visible dans le texte OCR)`;
+        champ.extrait = `${champ.extrait.replace(/[☒☑■✕✗☐□]/g, "").trim()} (case cochée non visible dans le texte OCR)`;
+      }
+    }
+    // 2. Champ à cases du CERFA dont la ligne d'origine ne montre aucune case : rien ne
+    //    permet de choisir une option, la valeur est « non lue ». Les groupes de la
+    //    partie 6 sont traités ensuite par l'heuristique de la case disparue.
+    if (type === "cerfa_formulaire" && champ.valeur !== null && optionsChamp(type, chemin)) {
+      const ligne = ligneSource(markdown, champ.extrait);
+      if (ligne && !SYMBOLES_CASES.test(ligne)) {
+        champ.valeur = null;
+        champ.confiance = 0.2;
+        champ.extrait = `${ligne.trim().slice(0, 80)} (aucune case visible dans le texte OCR)`;
       }
     }
   });

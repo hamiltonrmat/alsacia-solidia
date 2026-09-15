@@ -1,91 +1,96 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import type { ResultatRecherche } from "@/data/solis";
-import { Alerte, Badge, Bouton, Carte, Chargement, Titre, useMonte } from "@/components/ui";
-import { lecteurDepuisDossier, metadonneesExport, nomUsager } from "@/lib/dossier-utils";
-import { LIBELLES_ORIENTATION } from "@/lib/regles/decision";
-import { useDossierStore } from "@/store/dossier-store";
+import { useState } from "react";
+import { Alerte, Badge, Bouton, Carte, Titre, useMonte } from "@/components/ui";
+import { LIBELLES_PIECES, TYPES_A_ECARTER } from "@/lib/decoupage";
+import { lecteurDepuisDossier, metadonneesExport, nomUsager, usagerRattache } from "@/lib/dossier-utils";
+import { destinataireOrientation, LIBELLES_ORIENTATION, statutPourOrientation } from "@/lib/regles/decision";
+import { LIBELLES_STATUT, TEINTES_STATUT } from "@/lib/statuts";
+import { useDossierStore, type DocumentRetourGed } from "@/store/dossier-store";
+
+function slug(texte: string): string {
+  return texte
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
 
 export function EtapeExport({ id }: { id: string }) {
   const monte = useMonte();
   const dossier = useDossierStore((s) => s.dossiers[id]);
   const definirExport = useDossierStore((s) => s.definirExport);
-  const [recherche, setRecherche] = useState<ResultatRecherche | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
-  const [exportEnCours, setExportEnCours] = useState(false);
+  const [enCours, setEnCours] = useState(false);
   const [voirMetadonnees, setVoirMetadonnees] = useState(false);
-
-  const nir = dossier ? lecteurDepuisDossier(dossier)("cerfa_formulaire", "demandeur.nir") : null;
-  const nomNaissance = dossier ? lecteurDepuisDossier(dossier)("cerfa_formulaire", "demandeur.nom_naissance") : null;
-  const dateNaissance = dossier ? lecteurDepuisDossier(dossier)("cerfa_formulaire", "demandeur.date_naissance") : null;
-  const dejaExporte = Boolean(dossier?.export);
-
-  useEffect(() => {
-    if (!monte || !dossier || dejaExporte || recherche) return;
-    let annule = false;
-    fetch("/api/solis", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "rechercher", nir, nomNaissance, dateNaissance }),
-    })
-      .then(async (r) => {
-        if (!r.ok) throw new Error(`Solis a répondu ${r.status}`);
-        return (await r.json()) as ResultatRecherche;
-      })
-      .then((res) => !annule && setRecherche(res))
-      .catch((e: unknown) => !annule && setErreur(e instanceof Error ? e.message : "Connexion à Solis impossible"));
-    return () => {
-      annule = true;
-    };
-  }, [monte, dossier, dejaExporte, recherche, nir, nomNaissance, dateNaissance]);
+  const [courrierOuvert, setCourrierOuvert] = useState<string | null>(null);
 
   if (!monte || !dossier) return null;
   if (!dossier.decision?.valideLe && !dossier.export) {
-    return <Alerte teinte="attention">La décision n&apos;a pas été validée. Revenez à l&apos;étape précédente.</Alerte>;
+    return <Alerte teinte="attention">L&apos;orientation n&apos;a pas été validée. Revenez à l&apos;étape précédente.</Alerte>;
   }
 
+  const orientation = dossier.decision?.orientationRetenue ?? dossier.decision?.resultat.orientation ?? "indeterminee";
+  const statut = dossier.export?.statut ?? statutPourOrientation(orientation);
+  const caisse = lecteurDepuisDossier(dossier)("cerfa_formulaire", "caisse_retraite");
+  const rattache = usagerRattache(dossier);
+  const nouveau = dossier.rapprochement?.decision?.type === "nouveau";
   const metadonnees = metadonneesExport(dossier);
+  const nir = lecteurDepuisDossier(dossier)("cerfa_formulaire", "demandeur.nir");
+  const documents: DocumentRetourGed[] = (dossier.pieces ?? [])
+    .filter((p) => !TYPES_A_ECARTER.includes(p.type))
+    .map((p) => ({ pieceId: p.id, type: p.type, pages: p.pages, confidentiel: p.type === "certificat_medical" }));
 
-  async function exporter() {
+  async function enregistrer() {
     if (!dossier) return;
-    setExportEnCours(true);
+    setEnCours(true);
     setErreur(null);
     try {
       const reponse = await fetch("/api/solis", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "exporter",
+          action: "enregistrer",
           dossierId: dossier.id,
-          numeroUsagerExistant: recherche?.trouve ? recherche.usager.numeroUsager : null,
+          statut,
+          numeroUsagerExistant: rattache?.usager.numeroUsager ?? null,
+          numeroDemandeExistante: rattache?.demandeEnCours?.numero ?? null,
           metadonnees,
         }),
       });
-      const data = (await reponse.json()) as { action: "cree" | "rattache"; numeroUsager: string; numeroDossier: string; horodatage: string } | { error: string };
+      const data = (await reponse.json()) as
+        | { action: "cree" | "rattache" | "mis_a_jour"; numeroUsager: string; numeroDossier: string; statut: typeof statut; horodatage: string }
+        | { error: string };
       if (!reponse.ok || "error" in data) throw new Error("error" in data ? data.error : `Erreur ${reponse.status}`);
-      definirExport(dossier.id, { ...data, metadonnees });
+      definirExport(dossier.id, { ...data, metadonnees, retourGed: documents });
     } catch (e) {
-      setErreur(e instanceof Error ? e.message : "Export impossible");
+      setErreur(e instanceof Error ? e.message : "Enregistrement impossible");
     } finally {
-      setExportEnCours(false);
+      setEnCours(false);
     }
   }
+
+  const LIBELLES_ACTION = {
+    cree: "Usager créé et demande enregistrée",
+    rattache: "Demande enregistrée et rattachée à l'usager existant",
+    mis_a_jour: "Envoi rattaché à la demande déjà en cours",
+  };
 
   return (
     <main className="flex flex-col gap-6">
       <Titre
-        surtitre="Étape finale"
-        titre="Export vers le logiciel métier Solis"
-        description="L'usager est recherché dans Solis par son numéro de sécurité sociale, puis par son état civil. S'il est connu, la demande est rattachée à son dossier ; sinon, un usager est créé. Les métadonnées d'instruction sont transmises avec la demande."
+        surtitre="Étape 5"
+        titre="Enregistrement et transmission"
+        description="La demande est enregistrée dans le logiciel métier avec son statut, rattachée à l'usager confirmé ou à un usager créé, puis transmise au destinataire de l'orientation. Les pièces typées sont déposées dans la GED sous l'usager, avec le numéro de demande en retour d'index."
         actions={
           dossier.export ? (
             <Bouton variante="secondaire" href="/ged">
               Retour à la GED
             </Bouton>
           ) : (
-            <Bouton onClick={exporter} disabled={!recherche || exportEnCours}>
-              {exportEnCours ? "Export en cours…" : "Exporter vers Solis"}
+            <Bouton onClick={enregistrer} disabled={enCours || !dossier.rapprochement?.decision}>
+              {enCours ? "Enregistrement en cours…" : "Enregistrer dans Solis et transmettre"}
             </Bouton>
           )
         }
@@ -94,91 +99,125 @@ export function EtapeExport({ id }: { id: string }) {
       {erreur ? <Alerte teinte="danger" titre="Erreur">{erreur}</Alerte> : null}
 
       {dossier.export ? (
-        <Alerte teinte="succes" titre={dossier.export.action === "rattache" ? "Demande rattachée à l'usager existant" : "Usager créé et demande enregistrée"}>
+        <Alerte teinte="succes" titre={LIBELLES_ACTION[dossier.export.action]}>
           <p>
-            Usager <strong>{dossier.export.numeroUsager}</strong> · Dossier <strong>{dossier.export.numeroDossier}</strong> · le{" "}
-            {new Date(dossier.export.horodatage).toLocaleString("fr-FR")}
+            Usager <strong>{dossier.export.numeroUsager}</strong> · Demande <strong>{dossier.export.numeroDossier}</strong> · statut{" "}
+            <strong>{LIBELLES_STATUT[dossier.export.statut]}</strong> · le {new Date(dossier.export.horodatage).toLocaleString("fr-FR")}
           </p>
-          <p className="mt-1">Orientation transmise : {dossier.decision?.orientationRetenue ? LIBELLES_ORIENTATION[dossier.decision.orientationRetenue] : "—"}</p>
+          <p className="mt-1">Transmis à : {destinataireOrientation(orientation, caisse)}.</p>
         </Alerte>
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Carte titre="Usager dans Solis" sousTitre="Logiciel métier (simulation)">
-          {dossier.export ? (
-            <p className="text-sm text-slate-600 dark:text-slate-400">Export effectué.</p>
-          ) : !recherche ? (
-            <Chargement texte="Recherche de l'usager dans Solis…" />
-          ) : recherche.trouve ? (
-            <div className="flex flex-col gap-3 text-sm">
+        <Carte titre="Usager" sousTitre="Rapprochement confirmé au contrôle des données">
+          {rattache ? (
+            <div className="flex flex-col gap-2 text-sm">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge teinte="primaire">Usager connu</Badge>
-                <Badge>trouvé par {recherche.critere === "nir" ? "NIR" : "état civil"}</Badge>
+                <Badge>{rattache.usager.numeroUsager}</Badge>
               </div>
               <p>
-                <strong>{recherche.usager.numeroUsager}</strong> · {recherche.usager.prenoms} {recherche.usager.nomNaissance}
-                {recherche.usager.nomUsage ? ` (${recherche.usager.nomUsage})` : ""} · né(e) le {recherche.usager.dateNaissance}
+                {rattache.usager.civilite} {rattache.usager.prenoms} {rattache.usager.nomNaissance}
+                {rattache.usager.nomUsage ? ` (${rattache.usager.nomUsage})` : ""} · né(e) le {rattache.usager.dateNaissance}
               </p>
-              <p className="text-slate-500">{recherche.usager.adresse}</p>
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-slate-200 text-left text-slate-500 dark:border-slate-800">
-                    <th className="py-1 pr-2 font-medium">Dossier</th>
-                    <th className="py-1 pr-2 font-medium">Type</th>
-                    <th className="py-1 pr-2 font-medium">Date</th>
-                    <th className="py-1 font-medium">Statut</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recherche.usager.dossiers.map((d) => (
-                    <tr key={d.numero} className="border-b border-slate-100 dark:border-slate-900">
-                      <td className="py-1 pr-2 font-mono">{d.numero}</td>
-                      <td className="py-1 pr-2">{d.type}</td>
-                      <td className="py-1 pr-2">{d.dateDemande}</td>
-                      <td className="py-1">{d.statut}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <p className="text-slate-600 dark:text-slate-400">Ce n&apos;est pas une première demande : la nouvelle demande sera rattachée à cet usager.</p>
+              <p className="text-slate-500">{rattache.usager.adresse}</p>
+              {rattache.demandeEnCours ? (
+                <p className="rounded border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-900">
+                  Demande {rattache.demandeEnCours.numero} déjà en cours : cet envoi y est rattaché, aucune nouvelle demande n&apos;est créée.
+                </p>
+              ) : (
+                <p className="text-slate-600">Ce n&apos;est pas une première demande : la demande sera rattachée à cet usager.</p>
+              )}
+            </div>
+          ) : nouveau ? (
+            <div className="flex flex-col gap-2 text-sm">
+              <Badge teinte="succes" className="self-start">
+                Nouvel usager
+              </Badge>
+              <p>
+                {nomUsager(dossier) ?? "Identité lue"} · NIR <span className="font-mono">{nir ?? "—"}</span>. Première demande : un usager sera créé.
+              </p>
             </div>
           ) : (
-            <div className="flex flex-col gap-2 text-sm">
-              <Badge teinte="succes" className="self-start">Usager inconnu</Badge>
-              <p>
-                Aucun usager ne correspond au NIR {nir ?? "—"} ni à {nomUsager(dossier) ?? "l'état civil lu"} ({dateNaissance ?? "date de naissance non lue"}). Première demande : un
-                usager sera créé dans Solis.
-              </p>
-            </div>
+            <Alerte teinte="attention">Le rapprochement n&apos;a pas été confirmé au contrôle des données.</Alerte>
           )}
         </Carte>
 
-        <Carte
-          titre="Métadonnées transmises"
-          sousTitre="Identité, demande, pièces et instruction"
-          actions={
-            <Bouton variante="secondaire" onClick={() => setVoirMetadonnees((v) => !v)}>
-              {voirMetadonnees ? "Masquer le JSON" : "Voir le JSON"}
-            </Bouton>
-          }
-        >
+        <Carte titre="Demande" sousTitre="Ce qui est enregistré dans Solis">
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-            <dt className="text-slate-500">Usager</dt>
-            <dd>{nomUsager(dossier) ?? "—"}</dd>
-            <dt className="text-slate-500">NIR</dt>
-            <dd className="font-mono">{nir ?? "—"}</dd>
+            <dt className="text-slate-500">Enregistrement</dt>
+            <dd className="font-mono">{dossier.numeroEnregistrement}</dd>
+            <dt className="text-slate-500">Réception</dt>
+            <dd>{dossier.dateReception}</dd>
+            <dt className="text-slate-500">Complétude</dt>
+            <dd>{dossier.dateCompletude ?? "en attente de pièces"}</dd>
             <dt className="text-slate-500">Recevabilité</dt>
             <dd>{dossier.conformite?.recevabilite ?? "—"}</dd>
             <dt className="text-slate-500">Orientation</dt>
-            <dd>{dossier.decision?.orientationRetenue ? LIBELLES_ORIENTATION[dossier.decision.orientationRetenue] : "—"}</dd>
-            <dt className="text-slate-500">Pièces</dt>
-            <dd>{(dossier.pieces ?? []).length}</dd>
+            <dd>{LIBELLES_ORIENTATION[orientation]}</dd>
+            <dt className="text-slate-500">Statut</dt>
+            <dd>
+              <Badge teinte={TEINTES_STATUT[statut]}>{LIBELLES_STATUT[statut]}</Badge>
+            </dd>
+            <dt className="text-slate-500">Destinataire</dt>
+            <dd>{destinataireOrientation(orientation, caisse)}</dd>
           </dl>
-          {voirMetadonnees ? (
-            <pre className="mt-3 max-h-96 overflow-auto rounded-md border border-slate-200 bg-slate-50 p-3 font-mono text-xs dark:border-slate-800 dark:bg-slate-900">
-              {JSON.stringify(metadonnees, null, 2)}
-            </pre>
-          ) : null}
+          <div className="mt-3">
+            <Bouton variante="secondaire" onClick={() => setVoirMetadonnees((v) => !v)}>
+              {voirMetadonnees ? "Masquer les métadonnées" : "Voir les métadonnées transmises (JSON)"}
+            </Bouton>
+            {voirMetadonnees ? (
+              <pre className="mt-3 max-h-96 overflow-auto rounded-md border border-slate-200 bg-slate-50 p-3 font-mono text-xs">{JSON.stringify(metadonnees, null, 2)}</pre>
+            ) : null}
+          </div>
+        </Carte>
+
+        <Carte titre="Courriers" sousTitre={`${dossier.courriers.length} courrier(s) généré(s)`}>
+          {dossier.courriers.length === 0 ? (
+            <p className="text-sm text-slate-500">Aucun courrier généré.</p>
+          ) : (
+            <ul className="flex flex-col gap-2 text-sm">
+              {dossier.courriers.map((c) => (
+                <li key={c.type} className="rounded-md border border-slate-200 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-medium">{c.libelle}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-500">{new Date(c.genereLe).toLocaleString("fr-FR")}</span>
+                      <Bouton variante="discret" className="px-0 py-0 text-xs" onClick={() => setCourrierOuvert(courrierOuvert === c.type ? null : c.type)}>
+                        {courrierOuvert === c.type ? "Masquer" : "Afficher"}
+                      </Bouton>
+                    </div>
+                  </div>
+                  {courrierOuvert === c.type ? <textarea readOnly value={c.texte} rows={14} className="mt-2 w-full rounded-md border border-slate-300 bg-white p-2 font-mono text-xs" /> : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Carte>
+
+        <Carte titre="Retour vers la GED" sousTitre={dossier.export ? `Pièces déposées sous l'usager ${dossier.export.numeroUsager}` : "Pièces qui seront déposées sous l'usager"}>
+          <ul className="flex flex-col gap-2 text-sm">
+            {documents.map((d) => (
+              <li key={d.pieceId} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 px-3 py-2">
+                <span>
+                  {LIBELLES_PIECES[d.type]} <span className="text-xs text-slate-500">p. {d.pages.join(", ")}</span>
+                  {d.confidentiel ? <Badge teinte="attention" className="ml-2">confidentiel, EMS seulement</Badge> : null}
+                </span>
+                <a
+                  href={`/api/dossiers/${dossier.id}/pieces?pages=${d.pages.join(",")}&nom=${slug(LIBELLES_PIECES[d.type])}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs font-medium text-blue-700 hover:underline"
+                >
+                  Ouvrir le PDF de la pièce
+                </a>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 text-xs text-slate-500">
+            Chaque pièce est indexée dans la GED avec le numéro d&apos;enregistrement{dossier.export ? `, le numéro de demande ${dossier.export.numeroDossier}` : ""} et son type. Le
+            certificat médical est déposé avec un accès restreint à l&apos;équipe médico-sociale.
+          </p>
         </Carte>
       </div>
     </main>

@@ -17,6 +17,7 @@ export type TypePage =
   | "avis_imposition"
   | "jugement_protection"
   | "taxe_fonciere"
+  | "page_vide"
   | "inconnu";
 
 export type TypePiece = TypePage;
@@ -56,11 +57,15 @@ export const LIBELLES_PIECES: Record<TypePiece, string> = {
   avis_imposition: "Avis d'imposition",
   jugement_protection: "Décision de justice (mesure de protection)",
   taxe_fonciere: "Avis de taxe foncière",
+  page_vide: "Page vide ou illisible (à écarter)",
   inconnu: "Pièce non identifiée",
 };
 
 /** Types de pièces qui n'entrent pas dans l'instruction. */
-export const TYPES_A_ECARTER: TypePiece[] = ["cerfa_notice", "cerfa_rgpd"];
+export const TYPES_A_ECARTER: TypePiece[] = ["cerfa_notice", "cerfa_rgpd", "page_vide"];
+
+/** En deçà de ce nombre de caractères utiles, une page est considérée vide ou illisible. */
+const SEUIL_PAGE_VIDE = 40;
 
 /** Types de pièces pour lesquels une extraction de champs est prévue. */
 export const TYPES_EXTRAITS: TypePiece[] = [
@@ -159,6 +164,17 @@ function apercuDe(markdown: string): string {
 export function classerPage(numero: number, markdown: string): PageClassee {
   const texte = normaliser(markdown);
   const apercu = apercuDe(markdown);
+
+  const utile = texte.replace(/[^a-z0-9]/g, "");
+  if (utile.length < SEUIL_PAGE_VIDE) {
+    return {
+      numero,
+      type: "page_vide",
+      confiance: 0.9,
+      justification: `${utile.length} caractère(s) lisible(s) seulement : page vide, illisible ou mal numérisée`,
+      apercu,
+    };
+  }
 
   const pageCerfa = numeroPageCerfa(markdown);
   if (pageCerfa !== undefined) {

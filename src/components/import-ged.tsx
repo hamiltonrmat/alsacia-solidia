@@ -6,6 +6,8 @@ import type { DossierGed, LotGedAvecDossiers } from "@/app/api/ged/lots/route";
 import { cheminEtape, libelleEtape } from "@/components/dossiers-en-cours";
 import { Alerte, Badge, Bouton, Carte, Chargement, Titre, useMonte } from "@/components/ui";
 import { classerPages, regrouperEnPieces } from "@/lib/decoupage";
+import { appliquerSecretMedical } from "@/lib/secret-medical";
+import { LIBELLES_STATUT, TEINTES_STATUT } from "@/lib/statuts";
 import { useDossierStore } from "@/store/dossier-store";
 
 type EtatImport = { id: string; message: string } | null;
@@ -59,9 +61,10 @@ export function ImportGed() {
       const reponse = await fetch(`/api/dossiers/${dossier.id}/ocr`, { method: "POST" });
       const data = (await reponse.json()) as { pages: Array<{ index: number; markdown: string }>; modele: string; dureeMs: number } | { error: string };
       if (!reponse.ok || "error" in data) throw new Error("error" in data ? data.error : `Erreur ${reponse.status}`);
-      definirOcr(dossier.id, data);
-      setImportEnCours({ id: dossier.id, message: "Classification des pages…" });
+      setImportEnCours({ id: dossier.id, message: "Typage des pages et mise sous pli du certificat médical…" });
       const pagesClassees = classerPages(data.pages);
+      // Le contenu médical est retiré du texte conservé avant tout affichage.
+      definirOcr(dossier.id, { ...data, pages: appliquerSecretMedical(data.pages, pagesClassees) });
       definirDecoupage(dossier.id, pagesClassees, regrouperEnPieces(pagesClassees));
       router.push(`/dossiers/${dossier.id}/decoupage`);
     } catch (e) {
@@ -78,7 +81,7 @@ export function ImportGed() {
       <Titre
         surtitre="Étape préalable"
         titre="Import depuis la GED"
-        description="Les dossiers numérisés arrivent par lots. Sélectionnez un lot, puis chargez le dossier à instruire : l'OCR démarre aussitôt et le dossier entre dans le poste de travail."
+        description="Les dossiers numérisés arrivent par lots. Sélectionnez un lot, puis chargez le dossier à traiter : il reçoit un numéro d'enregistrement, l'OCR démarre aussitôt et le dossier entre dans la bannette du poste de travail."
       />
 
       {erreur ? <Alerte teinte="danger" titre="Erreur">{erreur}</Alerte> : null}
@@ -135,7 +138,14 @@ export function ImportGed() {
                             Reçu le {d.dateReception} · {d.nbPages} pages · {d.tailleKo ? `${(d.tailleKo / 1024).toFixed(1)} Mo` : "PDF non généré"}
                           </p>
                         </div>
-                        {enPoste ? <Badge teinte={enPoste.etape === "termine" ? "succes" : "primaire"}>{libelleEtape(enPoste.etape)}</Badge> : <Badge>À traiter</Badge>}
+                        {enPoste ? (
+                          <span className="flex flex-wrap items-center gap-1">
+                            <Badge teinte={TEINTES_STATUT[enPoste.statut]}>{LIBELLES_STATUT[enPoste.statut]}</Badge>
+                            {enPoste.etape !== "termine" ? <Badge>{libelleEtape(enPoste.etape)}</Badge> : null}
+                          </span>
+                        ) : (
+                          <Badge>À traiter</Badge>
+                        )}
                       </div>
 
                       <details className="mt-2 text-sm">

@@ -3,11 +3,11 @@ import { DossiersEnCours } from "@/components/dossiers-en-cours";
 
 const ETAPES = [
   { n: 1, titre: "Import GED", texte: "Choix du lot de numérisation et du dossier à instruire, OCR immédiat." },
-  { n: 2, titre: "Découpage", texte: "Chaque page est reconnue et regroupée en pièces : CERFA, CNI, RIB, certificat…" },
-  { n: 3, titre: "Pré-contrôle", texte: "Les champs sont extraits avec un score de confiance, l'agent corrige ce qui doit l'être." },
-  { n: 4, titre: "Conformité", texte: "Pièces obligatoires, validité, cohérence : le dossier est recevable ou non." },
-  { n: 5, titre: "Aide à la décision", texte: "Les règles administratives proposent une orientation, l'agent tranche." },
-  { n: 6, titre: "Export Solis", texte: "L'usager est créé ou retrouvé dans le logiciel métier, la demande y est rattachée." },
+  { n: 2, titre: "Typage des pièces", texte: "Chaque page est reconnue et regroupée en pièces : CERFA, CNI, RIB, certificat mis sous pli…" },
+  { n: 3, titre: "Contrôle des données", texte: "Les champs sont extraits en regard du document, l'agent vérifie les champs critiques et rapproche l'usager." },
+  { n: 4, titre: "Complétude et recevabilité", texte: "Pièces obligatoires, validité, cohérence : recevable ou non, délais et courrier à l'usager." },
+  { n: 5, titre: "Pré-instruction", texte: "Les règles administratives proposent une orientation, l'agent la retient." },
+  { n: 6, titre: "Enregistrement et transmission", texte: "La demande est enregistrée dans Solis avec son statut, transmise, les pièces déposées dans la GED." },
 ];
 
 const CARACTERISTIQUES = [
@@ -21,7 +21,7 @@ const CARACTERISTIQUES = [
   },
   {
     titre: "Contrôles lisibles",
-    texte: "Chaque contrôle de conformité et chaque règle de décision est formulé en français, avec son verdict et son motif.",
+    texte: "Chaque contrôle de complétude et chaque règle de pré-instruction est formulé en français, avec son verdict et son motif. Chaque action de l'agent est journalisée.",
   },
   {
     titre: "Démonstration sans risque",
@@ -99,7 +99,7 @@ export default function Accueil() {
                 </li>
               </ul>
               <div className="mt-4 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800">
-                Orientation proposée : transmettre à l&apos;instruction APA
+                Orientation proposée : transmettre à l&apos;équipe médico-sociale
               </div>
             </div>
             <div className="absolute -bottom-4 -right-4 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-md">

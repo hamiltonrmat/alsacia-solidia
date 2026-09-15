@@ -1,9 +1,11 @@
+import type { DossierSolis, UsagerSolis } from "@/data/solis";
 import { LIBELLES_PIECES, type Piece, type TypePiece } from "@/lib/decoupage";
 import { ajouterAnnees, formaterDateFr, moisEntre, parserDateFr } from "@/lib/dates";
 import { ibanValide, nirValide } from "@/lib/identifiants";
+import { PARAMETRES } from "./parametres";
 
 /**
- * Phase 2 : contrôles de conformité des pièces et pré-recevabilité.
+ * Phase 2 : complétude des pièces, cohérence et pré-recevabilité.
  *
  * Les règles ci-dessous sont un premier jeu, à affiner avec l'expertise
  * métier. Chaque contrôle est expliqué pour que l'agent comprenne le verdict.
@@ -35,6 +37,14 @@ export type EntreeConformite = {
   pieces: Piece[];
   lire: Lecteur;
   dateReception: string;
+  /** Numéros officiels (5 à 9) des pages du formulaire présentes, doublons compris. */
+  pagesCerfa?: number[];
+  /** Résultat du rapprochement d'identité avec le logiciel métier. */
+  rapprochement?: {
+    confirme: boolean;
+    usager: UsagerSolis | null;
+    demandeEnCours: DossierSolis | null;
+  };
 };
 
 export const LIBELLES_RECEVABILITE: Record<Recevabilite, string> = {
@@ -43,12 +53,23 @@ export const LIBELLES_RECEVABILITE: Record<Recevabilite, string> = {
   non_recevable: "Dossier non recevable",
 };
 
+const PAGES_FORMULAIRE = [5, 6, 7, 8, 9];
+
 function normaliser(v: string | null): string {
   return (v ?? "")
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
     .toUpperCase()
     .replace(/[^A-Z]/g, "");
+}
+
+/** Adresse réduite aux lettres et chiffres, pour comparaison. */
+function normaliserAdresse(v: string | null): string {
+  return (v ?? "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
 }
 
 function premierPrenom(v: string | null): string {
@@ -61,12 +82,11 @@ function contientNom(texte: string | null, ...noms: Array<string | null>): boole
 }
 
 export function evaluerConformite(entree: EntreeConformite): ResultatConformite {
-  const { pieces, lire, dateReception } = entree;
+  const { pieces, lire, dateReception, pagesCerfa, rapprochement } = entree;
   const controles: Controle[] = [];
   const piecesManquantes: string[] = [];
   const reception = parserDateFr(dateReception) ?? new Date();
   const present = (type: TypePiece) => pieces.some((p) => p.type === type);
-
   const ajouter = (c: Controle) => controles.push(c);
 
   // --- Présence des pièces obligatoires ---------------------------------
@@ -85,21 +105,54 @@ export function evaluerConformite(entree: EntreeConformite): ResultatConformite 
     }
   }
 
-  ajouter(
-    present("certificat_medical")
-      ? { id: "presence-cm", libelle: "Certificat médical", statut: "ok", detail: "Certificat médical joint.", piece: "certificat_medical" }
-      : {
-          id: "presence-cm",
-          libelle: "Certificat médical",
-          statut: "info",
-          detail: "Pièce facultative, absente. L'évaluation médico-sociale à domicile pourra la remplacer.",
-          piece: "certificat_medical",
-        },
-  );
+  // --- Formulaire complet, sans doublon, un seul demandeur ----------------
+  if (present("cerfa_formulaire") && pagesCerfa) {
+    const manquantes = PAGES_FORMULAIRE.filter((n) => !pagesCerfa.includes(n));
+    const doublons = PAGES_FORMULAIRE.filter((n) => pagesCerfa.filter((p) => p === n).length > 1);
+    if (manquantes.length) {
+      piecesManquantes.push(`Page(s) ${manquantes.join(", ")} du formulaire de demande`);
+      ajouter({ id: "formulaire-complet", libelle: "Formulaire complet (pages 5 à 9)", statut: "bloquant", detail: `Page(s) manquante(s) : ${manquantes.join(", ")}. Le formulaire doit être fourni en entier${manquantes.includes(9) ? ", y compris la page de signature" : ""}.`, piece: "cerfa_formulaire" });
+    } else {
+      ajouter({ id: "formulaire-complet", libelle: "Formulaire complet (pages 5 à 9)", statut: "ok", detail: "Les cinq pages du formulaire sont présentes.", piece: "cerfa_formulaire" });
+    }
+    if (doublons.length) {
+      ajouter({ id: "formulaire-doublons", libelle: "Pages en double", statut: "alerte", detail: `Page(s) ${doublons.join(", ")} présente(s) plusieurs fois : page numérisée deux fois, ou second formulaire (un dossier par demandeur pour un couple). Vérifier au typage des pièces.`, piece: "cerfa_formulaire" });
+    }
+  }
+  const nbFormulaires = pieces.filter((p) => p.type === "cerfa_formulaire").length;
+  if (nbFormulaires > 1) {
+    ajouter({ id: "formulaire-multiple", libelle: "Plusieurs formulaires détectés", statut: "alerte", detail: `${nbFormulaires} formulaires distincts dans le même envoi. Si les deux membres d'un couple font une demande, ouvrir un dossier par demandeur.`, piece: "cerfa_formulaire" });
+  }
 
-  // --- Pièces conditionnelles -------------------------------------------
+  // --- Signature -----------------------------------------------------------
   const statutProtection = lire("cerfa_formulaire", "protection.statut");
   const qualiteSignature = lire("cerfa_formulaire", "signature.qualite");
+  const signataire = lire("cerfa_formulaire", "signature.nom") ?? lire("cerfa_formulaire", "signature.prenoms");
+  const dateSignature = parserDateFr(lire("cerfa_formulaire", "signature.date"));
+  if (present("cerfa_formulaire") && (!pagesCerfa || pagesCerfa.includes(9))) {
+    if (!signataire && !dateSignature) {
+      ajouter({ id: "signature-presence", libelle: "Formulaire signé et daté", statut: "alerte", detail: "Ni nom du signataire ni date de signature lus : vérifier que la page 9 est signée. Un formulaire non signé est à retourner à l'usager.", piece: "cerfa_formulaire" });
+    } else if (!dateSignature) {
+      ajouter({ id: "signature-presence", libelle: "Formulaire signé et daté", statut: "alerte", detail: `Signataire : ${signataire}. Date de signature non lue.`, piece: "cerfa_formulaire" });
+    } else if (dateSignature.getTime() > reception.getTime()) {
+      ajouter({ id: "signature-presence", libelle: "Formulaire signé et daté", statut: "alerte", detail: `Date de signature (${formaterDateFr(dateSignature)}) postérieure à la réception : probable erreur de lecture.`, piece: "cerfa_formulaire" });
+    } else {
+      ajouter({ id: "signature-presence", libelle: "Formulaire signé et daté", statut: "ok", detail: `Signé par ${signataire ?? "le demandeur"} le ${formaterDateFr(dateSignature)}.`, piece: "cerfa_formulaire" });
+    }
+  }
+
+  if (qualiteSignature === "representant_legal" && statutProtection !== "prononcee") {
+    ajouter({ id: "signature-qualite", libelle: "Qualité du signataire", statut: "alerte", detail: "Signé par un représentant légal alors qu'aucune mesure de protection prononcée n'est déclarée." });
+  } else if (qualiteSignature === "en_mon_nom" && statutProtection === "prononcee") {
+    const mesure = lire("cerfa_formulaire", "protection.mesure");
+    ajouter({ id: "signature-qualite", libelle: "Qualité du signataire", statut: mesure === "tutelle" ? "alerte" : "info", detail: mesure === "tutelle" ? "Le demandeur est sous tutelle mais a signé en son nom : la signature du tuteur est attendue." : "Mesure de protection déclarée, signature en son nom : vérifier l'étendue de la mesure." });
+  } else if (qualiteSignature === null) {
+    ajouter({ id: "signature-qualite", libelle: "Qualité du signataire", statut: "alerte", detail: "La qualité du signataire (en son nom, représentant légal) n'a pas été lue." });
+  } else {
+    ajouter({ id: "signature-qualite", libelle: "Qualité du signataire", statut: "ok", detail: "Qualité du signataire cohérente avec la situation déclarée." });
+  }
+
+  // --- Pièces conditionnelles -------------------------------------------
   if (statutProtection === "prononcee" || qualiteSignature === "representant_legal") {
     if (present("jugement_protection")) {
       ajouter({ id: "jugement", libelle: "Décision de justice (mesure de protection)", statut: "ok", detail: "Jugement joint.", piece: "jugement_protection" });
@@ -139,23 +192,6 @@ export function evaluerConformite(entree: EntreeConformite): ResultatConformite 
     );
   }
 
-  // --- Cohérence signature / protection ----------------------------------
-  if (qualiteSignature === "representant_legal" && statutProtection !== "prononcee") {
-    ajouter({ id: "signature-representant", libelle: "Signature par un représentant légal", statut: "alerte", detail: "Signé par un représentant légal alors qu'aucune mesure de protection prononcée n'est déclarée." });
-  } else if (qualiteSignature === "en_mon_nom" && statutProtection === "prononcee") {
-    const mesure = lire("cerfa_formulaire", "protection.mesure");
-    ajouter({
-      id: "signature-representant",
-      libelle: "Signature du demandeur sous protection",
-      statut: mesure === "tutelle" ? "alerte" : "info",
-      detail: mesure === "tutelle" ? "Le demandeur est sous tutelle mais a signé en son nom : la signature du tuteur est attendue." : "Mesure de protection déclarée, signature en son nom : vérifier l'étendue de la mesure.",
-    });
-  } else if (qualiteSignature === null) {
-    ajouter({ id: "signature-representant", libelle: "Signature du formulaire", statut: "alerte", detail: "La qualité du signataire n'a pas été lue : vérifier que le formulaire est signé." });
-  } else {
-    ajouter({ id: "signature-representant", libelle: "Signature du formulaire", statut: "ok", detail: "Formulaire signé, qualité du signataire cohérente." });
-  }
-
   // --- Identité du demandeur ---------------------------------------------
   const nomNaissance = lire("cerfa_formulaire", "demandeur.nom_naissance");
   const nomUsage = lire("cerfa_formulaire", "demandeur.nom_usage");
@@ -191,6 +227,37 @@ export function evaluerConformite(entree: EntreeConformite): ResultatConformite 
       ? { id: "questionnaire", libelle: "Questionnaire d'autonomie (partie 4)", statut: "ok", detail: "Les 4 réponses sont lues.", piece: "cerfa_formulaire" }
       : { id: "questionnaire", libelle: "Questionnaire d'autonomie (partie 4)", statut: "alerte", detail: `${reponsesManquantes} réponse(s) non lue(s) : indispensable pour déterminer l'organisme compétent.`, piece: "cerfa_formulaire" },
   );
+
+  // --- Rapprochement avec le logiciel métier --------------------------------
+  if (rapprochement) {
+    if (!rapprochement.confirme) {
+      ajouter({ id: "rapprochement", libelle: "Rapprochement avec l'usager Solis", statut: "alerte", detail: "L'identité n'a pas été rapprochée des usagers connus : à confirmer au contrôle des données." });
+    } else if (rapprochement.usager) {
+      const u = rapprochement.usager;
+      const ecarts: string[] = [];
+      if (nomNaissance && normaliser(u.nomNaissance) !== normaliser(nomNaissance)) ecarts.push(`nom de naissance (Solis : ${u.nomNaissance})`);
+      const ddnSolis = parserDateFr(u.dateNaissance);
+      const ddnCerfa = parserDateFr(dateNaissance);
+      if (ddnSolis && ddnCerfa && ddnSolis.getTime() !== ddnCerfa.getTime()) ecarts.push(`date de naissance (Solis : ${u.dateNaissance})`);
+      ajouter(
+        ecarts.length
+          ? { id: "rapprochement", libelle: "Rapprochement avec l'usager Solis", statut: "alerte", detail: `Usager ${u.numeroUsager} rattaché, mais écart(s) avec le formulaire : ${ecarts.join(", ")}. Vérifier qu'il s'agit bien de la même personne et mettre Solis à jour.` }
+          : { id: "rapprochement", libelle: "Rapprochement avec l'usager Solis", statut: "ok", detail: `Usager connu ${u.numeroUsager}, identité concordante.` },
+      );
+      const voieCerfa = lire("cerfa_formulaire", "adresse.voie") ?? "";
+      const adresseCerfa = `${voieCerfa} ${lire("cerfa_formulaire", "adresse.code_postal") ?? ""}`.trim();
+      const cleVoie = normaliserAdresse(voieCerfa).slice(0, 12);
+      if (cleVoie.length >= 6 && !normaliserAdresse(u.adresse).includes(cleVoie)) {
+        ajouter({ id: "rapprochement-adresse", libelle: "Adresse connue de Solis", statut: "info", detail: `Solis : ${u.adresse}. Formulaire : ${adresseCerfa}, ${lire("cerfa_formulaire", "adresse.commune") ?? ""}. Adresse à mettre à jour lors de l'enregistrement.` });
+      }
+      if (rapprochement.demandeEnCours) {
+        const d = rapprochement.demandeEnCours;
+        ajouter({ id: "demande-double", libelle: "Demande déjà en cours", statut: "alerte", detail: `Une demande ${d.numero} (${d.type}) est en cours depuis le ${d.dateDemande}${d.commentaire ? ` : ${d.commentaire}` : "."} Rattacher le présent envoi à cette demande plutôt que d'en créer une nouvelle.` });
+      }
+    } else {
+      ajouter({ id: "rapprochement", libelle: "Rapprochement avec l'usager Solis", statut: "ok", detail: "Aucun usager correspondant : première demande, un usager sera créé à l'enregistrement." });
+    }
+  }
 
   // --- Pièce d'identité ----------------------------------------------------
   if (present("cni")) {
@@ -303,23 +370,16 @@ export function evaluerConformite(entree: EntreeConformite): ResultatConformite 
     }
   }
 
-  // --- Certificat médical -------------------------------------------------
+  // --- Certificat médical (volet administratif uniquement) ----------------
   const nomPatient = lire("certificat_medical", "patient.nom_naissance");
   const dateCmBrute = lire("certificat_medical", "date");
   const medecin = lire("certificat_medical", "medecin_nom");
   const rpps = lire("certificat_medical", "medecin_rpps");
-  const cmVierge = present("certificat_medical") && !nomPatient && !dateCmBrute && !medecin && !rpps && !lire("certificat_medical", "pathologies");
+  const cmVierge = present("certificat_medical") && !nomPatient && !dateCmBrute && !medecin && !rpps;
   if (cmVierge) {
-    // Le formulaire complet a été numérisé avec son annexe médicale non remplie.
-    const index = controles.findIndex((c) => c.id === "presence-cm");
-    controles[index] = {
-      id: "presence-cm",
-      libelle: "Certificat médical",
-      statut: "info",
-      detail: "L'annexe « certificat médical » est jointe mais vierge : elle est considérée comme absente (pièce facultative).",
-      piece: "certificat_medical",
-    };
+    ajouter({ id: "presence-cm", libelle: "Certificat médical", statut: "info", detail: "L'annexe « certificat médical » est jointe mais vierge : elle est considérée comme absente (pièce facultative).", piece: "certificat_medical" });
   } else if (present("certificat_medical")) {
+    ajouter({ id: "presence-cm", libelle: "Certificat médical", statut: "ok", detail: "Certificat médical joint, sous pli cacheté : son contenu médical n'est pas lu ici et sera transmis à l'équipe médico-sociale.", piece: "certificat_medical" });
     const ddnPatient = parserDateFr(lire("certificat_medical", "patient.date_naissance"));
     const ddnCerfa = parserDateFr(dateNaissance);
     const memePersonne = contientNom(nomPatient, nomNaissance, nomUsage) && (!ddnPatient || !ddnCerfa || ddnPatient.getTime() === ddnCerfa.getTime());
@@ -334,8 +394,8 @@ export function evaluerConformite(entree: EntreeConformite): ResultatConformite 
     } else {
       const mois = moisEntre(dateCm, reception);
       ajouter(
-        mois <= 3
-          ? { id: "cm-date", libelle: "Date du certificat médical", statut: "ok", detail: `Établi le ${formaterDateFr(dateCm)}, moins de 3 mois avant la réception.`, piece: "certificat_medical" }
+        mois <= PARAMETRES.moisValiditeCertificat
+          ? { id: "cm-date", libelle: "Date du certificat médical", statut: "ok", detail: `Établi le ${formaterDateFr(dateCm)}, moins de ${PARAMETRES.moisValiditeCertificat} mois avant la réception.`, piece: "certificat_medical" }
           : { id: "cm-date", libelle: "Date du certificat médical", statut: "alerte", detail: `Établi le ${formaterDateFr(dateCm)}, il y a ${mois} mois : certificat ancien.`, piece: "certificat_medical" },
       );
     }
@@ -344,6 +404,8 @@ export function evaluerConformite(entree: EntreeConformite): ResultatConformite 
         ? { id: "cm-medecin", libelle: "Médecin identifié", statut: "ok", detail: `${medecin ?? ""}${rpps ? ` (RPPS ${rpps})` : ""}`.trim(), piece: "certificat_medical" }
         : { id: "cm-medecin", libelle: "Médecin identifié", statut: "alerte", detail: "Ni nom ni RPPS lus : vérifier le cachet et la signature.", piece: "certificat_medical" },
     );
+  } else {
+    ajouter({ id: "presence-cm", libelle: "Certificat médical", statut: "info", detail: "Pièce facultative, absente. L'évaluation médico-sociale à domicile pourra la remplacer.", piece: "certificat_medical" });
   }
 
   // --- Synthèse -----------------------------------------------------------
@@ -354,24 +416,10 @@ export function evaluerConformite(entree: EntreeConformite): ResultatConformite 
     recevabilite === "non_recevable"
       ? `${nbBloquants} point(s) bloquant(s)${piecesManquantes.length ? `, ${piecesManquantes.length} pièce(s) à réclamer` : ""}. Le dossier ne peut pas partir en instruction en l'état.`
       : recevabilite === "recevable_sous_reserve"
-        ? `${nbAlertes} point(s) d'attention à apprécier par l'agent avant instruction.`
+        ? `${nbAlertes} point(s) d'attention à apprécier par l'agent avant transmission.`
         : "Toutes les pièces sont présentes et cohérentes.";
 
   return { controles, recevabilite, piecesManquantes, synthese, calculeLe: new Date().toISOString() };
-}
-
-/** Texte du courrier de demande de pièces, à partir du résultat de conformité. */
-export function courrierDemandePieces(resultat: ResultatConformite, nomUsager: string | null): string {
-  const lignes = resultat.piecesManquantes.map((p) => `  - ${p}`).join("\n");
-  return `Madame, Monsieur ${nomUsager ?? ""},
-
-Nous avons bien reçu votre demande d'allocation personnalisée d'autonomie. Pour pouvoir l'instruire, nous avons besoin des pièces suivantes :
-
-${lignes}
-
-Nous vous remercions de nous les transmettre dans un délai d'un mois. Sans réponse de votre part, votre demande ne pourra pas être examinée.
-
-Le service Autonomie`;
 }
 
 export function libellePiece(type: TypePiece): string {

@@ -1,22 +1,17 @@
 import type { Piece } from "@/lib/decoupage";
 import { ageA, formaterDateFr, moisEntre, parserDateFr } from "@/lib/dates";
+import type { StatutDossier } from "@/lib/statuts";
 import type { Lecteur, Recevabilite } from "./conformite";
+import { PARAMETRES } from "./parametres";
+
+export { PARAMETRES };
 
 /**
- * Phase 3 : aide à la décision. Applique les règles administratives connues
- * au dossier recevable et propose une orientation, que l'agent confirme.
- *
- * Paramètres à valider avec le métier : voir PARAMETRES.
+ * Phase 3 : pré-instruction. Applique les règles administratives au dossier
+ * et propose une orientation, que l'agent confirme. L'agent d'accueil ne
+ * décide pas de l'attribution de l'APA : il enregistre, vérifie la
+ * recevabilité et oriente vers le bon service ou organisme.
  */
-
-export const PARAMETRES = {
-  /** Condition d'âge de l'APA (CERFA 16301*01, notice partie 3). */
-  ageMinimumApa: 60,
-  /** Nombre minimal de réponses « non » au questionnaire pour relever du département. */
-  seuilNonQuestionnaire: 2,
-  /** Ancienneté de résidence (mois) en deçà de laquelle le département financeur est à déterminer. */
-  moisDomicileDeSecours: 3,
-};
 
 export type StatutRegle = "verifiee" | "non_verifiee" | "attention" | "indeterminee";
 
@@ -30,25 +25,35 @@ export type Regle = {
 export type Orientation = "instruction_apa" | "caisse_retraite" | "mdph" | "pieces_manquantes" | "indeterminee";
 
 export const LIBELLES_ORIENTATION: Record<Orientation, string> = {
-  instruction_apa: "Transmettre à l'instruction APA (département)",
-  caisse_retraite: "Réorienter vers la caisse de retraite",
-  mdph: "Réorienter vers la MDPH (PCH)",
-  pieces_manquantes: "Réclamer les pièces manquantes à l'usager",
-  indeterminee: "Compléter le dossier avant de décider",
+  instruction_apa: "Transmettre à l'équipe médico-sociale (instruction APA)",
+  caisse_retraite: "Transmettre à la caisse de retraite",
+  mdph: "Orienter vers la MDPH (PCH)",
+  pieces_manquantes: "Mettre en attente de pièces",
+  indeterminee: "Compléter le dossier avant d'orienter",
 };
 
-export type GirEstime = {
-  gir: number;
-  libelle: string;
-  score: number;
-  itemsRenseignes: number;
-};
+export const ORIENTATIONS: Orientation[] = ["instruction_apa", "caisse_retraite", "mdph", "pieces_manquantes", "indeterminee"];
+
+/** Statut du dossier une fois l'orientation validée. */
+export function statutPourOrientation(orientation: Orientation): StatutDossier {
+  switch (orientation) {
+    case "instruction_apa":
+      return "transmis_ems";
+    case "caisse_retraite":
+      return "transmis_caisse";
+    case "mdph":
+      return "oriente_mdph";
+    case "pieces_manquantes":
+      return "en_attente_pieces";
+    default:
+      return "en_cours";
+  }
+}
 
 export type ResultatDecision = {
   regles: Regle[];
   orientation: Orientation;
   recommandation: string;
-  girEstime?: GirEstime;
   calculeLe: string;
 };
 
@@ -59,61 +64,12 @@ export type EntreeDecision = {
   recevabilite: Recevabilite;
 };
 
-const LIBELLES_CAISSE: Record<string, string> = {
+export const LIBELLES_CAISSE: Record<string, string> = {
   assurance_retraite: "l'Assurance retraite",
   fonction_publique: "la caisse de retraite de la Fonction publique d'État",
   msa: "la MSA",
   autre: "sa caisse de retraite",
 };
-
-const ITEMS_EVALUATION = [
-  "transferts",
-  "deplacement_interieur",
-  "deplacement_exterieur",
-  "prehension",
-  "motricite_fine",
-  "toilette",
-  "habillage",
-  "alimentation",
-  "elimination_urinaire",
-  "elimination_fecale",
-  "orientation_temps",
-  "orientation_espace",
-  "securite",
-  "comportement",
-];
-
-/**
- * Estimation indicative du GIR à partir de la grille du certificat médical.
- * Ce n'est pas la grille AGGIR : l'évaluation à domicile fait foi.
- */
-export function estimerGir(lire: Lecteur): GirEstime | undefined {
-  let score = 0;
-  let renseignes = 0;
-  for (const item of ITEMS_EVALUATION) {
-    const v = lire("certificat_medical", `evaluation.${item}`);
-    if (v === "non_realise") {
-      score += 2;
-      renseignes += 1;
-    } else if (v === "avec_aide") {
-      score += 1;
-      renseignes += 1;
-    } else if (v === "seul") {
-      renseignes += 1;
-    }
-  }
-  if (renseignes < 8) return undefined;
-  const normalise = (score / (renseignes * 2)) * 28;
-  const gir = normalise >= 20 ? 2 : normalise >= 12 ? 3 : normalise >= 6 ? 4 : normalise >= 3 ? 5 : 6;
-  const libelles: Record<number, string> = {
-    2: "Dépendance forte (GIR 1-2)",
-    3: "Dépendance moyenne (GIR 3)",
-    4: "Dépendance partielle (GIR 4)",
-    5: "Dépendance légère (GIR 5)",
-    6: "Autonomie conservée (GIR 6)",
-  };
-  return { gir, libelle: libelles[gir], score: Math.round(normalise), itemsRenseignes: renseignes };
-}
 
 export function evaluerDecision(entree: EntreeDecision): ResultatDecision {
   const { lire, dateReception, recevabilite } = entree;
@@ -132,7 +88,7 @@ export function evaluerDecision(entree: EntreeDecision): ResultatDecision {
       id: "age",
       libelle: `Condition d'âge (${PARAMETRES.ageMinimumApa} ans et plus)`,
       statut: ageOk ? "verifiee" : "non_verifiee",
-      detail: `Né(e) le ${formaterDateFr(ddn)} : ${age} ans à la date de réception (${formaterDateFr(reception)}).${ageOk ? "" : " L'APA est réservée aux 60 ans et plus ; en deçà, la PCH relève de la MDPH."}`,
+      detail: `Né(e) le ${formaterDateFr(ddn)} : ${age} ans à la date de réception (${formaterDateFr(reception)}).${ageOk ? "" : ` L'APA est réservée aux ${PARAMETRES.ageMinimumApa} ans et plus ; en deçà, la PCH relève de la MDPH.`}`,
     });
   }
 
@@ -196,36 +152,52 @@ export function evaluerDecision(entree: EntreeDecision): ResultatDecision {
       : { id: "cumul", libelle: "Règle de non-cumul", statut: "verifiee", detail: "Aucune prestation non cumulable déclarée." },
   );
 
-  // --- GIR estimé ------------------------------------------------------------
-  const girEstime = estimerGir(lire);
-  if (girEstime) {
-    regles.push({
-      id: "gir",
-      libelle: "Perte d'autonomie (indicatif)",
-      statut: girEstime.gir <= 4 ? "verifiee" : "attention",
-      detail: `${girEstime.libelle} d'après le certificat médical (${girEstime.itemsRenseignes} items). ${girEstime.gir <= 4 ? "Compatible avec l'APA (GIR 1 à 4)." : "Les GIR 5 et 6 n'ouvrent pas droit à l'APA."} L'évaluation à domicile fait foi.`,
-    });
-  }
+  // --- Certificat médical : transmis sous pli, jamais lu ici ----------------
+  const cmJoint = entree.pieces.some((p) => p.type === "certificat_medical");
+  regles.push({
+    id: "certificat",
+    libelle: "Certificat médical",
+    statut: "verifiee",
+    detail: cmJoint
+      ? "Joint sous pli cacheté : transmis tel quel à l'équipe médico-sociale, qui seule en prend connaissance."
+      : "Non joint (facultatif). L'équipe médico-sociale évaluera à domicile.",
+  });
 
   // --- Orientation ------------------------------------------------------------
   let orientation: Orientation;
   let recommandation: string;
   if (ageOk === false) {
     orientation = "mdph";
-    recommandation = "Le demandeur n'a pas l'âge requis pour l'APA. Orienter vers la MDPH pour une prestation de compensation du handicap.";
+    recommandation = "Le demandeur n'a pas l'âge requis pour l'APA. Informer l'usager et l'orienter vers la MDPH pour une prestation de compensation du handicap.";
   } else if (departementCompetent === false) {
     orientation = "caisse_retraite";
     recommandation = `Le questionnaire d'autonomie oriente vers ${LIBELLES_CAISSE[caisse ?? "autre"] ?? "la caisse de retraite"}. Transmettre le dossier à cet organisme et en informer l'usager.`;
   } else if (recevabilite === "non_recevable") {
     orientation = "pieces_manquantes";
-    recommandation = "Le dossier est incomplet. Adresser à l'usager la demande de pièces avant toute instruction.";
+    recommandation = "Le dossier est incomplet. Enregistrer la demande en attente de pièces et adresser à l'usager la demande de pièces.";
   } else if (ageOk === undefined || departementCompetent === undefined) {
     orientation = "indeterminee";
-    recommandation = "Des informations essentielles n'ont pas pu être lues. Compléter le dossier avant de décider.";
+    recommandation = "Des informations essentielles n'ont pas pu être lues. Compléter le dossier avant d'orienter.";
   } else {
     orientation = "instruction_apa";
-    recommandation = `Conditions d'âge et de compétence remplies${recevabilite === "recevable_sous_reserve" ? ", sous réserve des points d'attention relevés" : ""}. Transmettre à l'instruction APA pour évaluation à domicile.`;
+    recommandation = `Conditions d'âge et de compétence remplies${recevabilite === "recevable_sous_reserve" ? ", sous réserve des points d'attention relevés" : ""}. Accuser réception et transmettre à l'équipe médico-sociale pour évaluation à domicile.`;
   }
 
-  return { regles, orientation, recommandation, girEstime, calculeLe: new Date().toISOString() };
+  return { regles, orientation, recommandation, calculeLe: new Date().toISOString() };
+}
+
+/** Destinataire de la transmission selon l'orientation retenue. */
+export function destinataireOrientation(orientation: Orientation, caisse: string | null): string {
+  switch (orientation) {
+    case "instruction_apa":
+      return "Équipe médico-sociale APA du Département";
+    case "caisse_retraite":
+      return `Caisse de retraite (${LIBELLES_CAISSE[caisse ?? "autre"] ?? "caisse de retraite"})`;
+    case "mdph":
+      return "Usager, orienté vers la MDPH";
+    case "pieces_manquantes":
+      return "Usager (demande de pièces)";
+    default:
+      return "Aucune transmission";
+  }
 }

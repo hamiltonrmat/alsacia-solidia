@@ -158,7 +158,31 @@ export const SCHEMA_CERFA_FORMULAIRE = objet({
   }),
 });
 
+/**
+ * Certificat médical, volet administratif seulement : le contenu médical est
+ * sous pli cacheté (voir src/lib/secret-medical.ts) et n'est jamais extrait
+ * pour l'agent d'accueil.
+ */
 export const SCHEMA_CERTIFICAT_MEDICAL = objet({
+  patient: objet({
+    nom_naissance: champ("Nom de naissance du patient"),
+    nom_usage: champ("Nom d'usage du patient"),
+    prenoms: champ("Prénom(s) du patient"),
+    date_naissance: champ(`Date de naissance du patient, ${DATE}`),
+    code_postal: champ("Code postal du patient"),
+    commune: champ("Commune du patient"),
+  }),
+  lieu: champ("Fait à (lieu)"),
+  date: champ(`Date du certificat, ${DATE}`),
+  medecin_nom: champ("Nom du médecin (cachet ou signature)"),
+  medecin_rpps: champ("Numéro RPPS du médecin, 11 chiffres"),
+});
+
+/**
+ * Certificat médical, volet complet. Réservé à un futur rôle « équipe
+ * médico-sociale » : il n'est pas exposé dans l'application de pré-instruction.
+ */
+export const SCHEMA_CERTIFICAT_MEDICAL_EMS = objet({
   patient: objet({
     nom_naissance: champ("Nom de naissance du patient"),
     nom_usage: champ("Nom d'usage du patient"),
@@ -265,7 +289,7 @@ export const SCHEMAS_PAR_TYPE: Partial<Record<TypePiece, { nom: string; schema: 
     nom: "cerfa_16301_certificat_medical",
     schema: SCHEMA_CERTIFICAT_MEDICAL,
     consigne:
-      "Le texte est l'annexe « certificat médical » du CERFA 16301*01 (pages 11 à 13). Les grilles d'évaluation sont des tableaux Markdown : la colonne marquée donne le niveau (1re colonne = seul, 2e = avec_aide, 3e = non_realise, 4e = nsp).",
+      "Le texte est l'annexe « certificat médical » du CERFA 16301*01 dont le contenu médical a été retiré (pli cacheté). N'extrais que l'identité du patient, le lieu, la date et le médecin (cachet ou signature).",
   },
   cni: { nom: "carte_identite", schema: SCHEMA_CNI, consigne: "Le texte est la photocopie d'une carte nationale d'identité française." },
   rib: { nom: "rib", schema: SCHEMA_RIB, consigne: "Le texte est un relevé d'identité bancaire." },
@@ -534,4 +558,59 @@ export function optionsChamp(type: TypePiece, chemin: string): string[] | null {
   const valeur = (courant.properties as Record<string, JsonSchema> | undefined)?.valeur;
   const options = valeur?.enum as Array<string | null> | undefined;
   return options ? options.filter((o): o is string => typeof o === "string") : null;
+}
+
+/**
+ * Champs critiques : ils commandent la recevabilité ou l'orientation et
+ * doivent être vérifiés explicitement par l'agent, même lus avec une bonne
+ * confiance (pratique du vidéocodage).
+ */
+export const CHAMPS_CRITIQUES: Partial<Record<TypePiece, string[]>> = {
+  cerfa_formulaire: [
+    "demandeur.nom_naissance",
+    "demandeur.prenoms",
+    "demandeur.date_naissance",
+    "demandeur.nir",
+    "questionnaire.se_lever",
+    "questionnaire.s_habiller",
+    "questionnaire.faire_sa_toilette",
+    "questionnaire.manger",
+    "protection.statut",
+    "signature.qualite",
+    "signature.date",
+  ],
+  certificat_medical: ["patient.nom_naissance", "patient.date_naissance", "date"],
+  cni: ["nom", "prenoms", "date_naissance", "date_expiration"],
+  rib: ["titulaire", "iban"],
+  avis_imposition: ["declarant_1", "annee_revenus", "revenu_fiscal_reference"],
+  jugement_protection: ["mesure", "personne_protegee_nom", "date"],
+};
+
+export function estChampCritique(type: TypePiece, chemin: string): boolean {
+  return CHAMPS_CRITIQUES[type]?.includes(chemin) ?? false;
+}
+
+/** Page officielle du CERFA (5 à 9) où se trouve chaque groupe de champs. */
+const PAGE_CERFA_PAR_GROUPE: Record<string, number> = {
+  demandeur: 5,
+  caisse_retraite: 5,
+  telephone: 5,
+  email: 5,
+  type_domicile: 5,
+  adresse: 5,
+  ancienne_residence: 5,
+  situation_familiale: 6,
+  conjoint: 6,
+  protection: 6,
+  proche: 7,
+  questionnaire: 7,
+  prestations: 7,
+  residence_principale: 8,
+  autres_biens_immobiliers: 8,
+  cmi: 9,
+  signature: 9,
+};
+
+export function pageCerfaPourChemin(chemin: string): number {
+  return PAGE_CERFA_PAR_GROUPE[chemin.split(".")[0]] ?? 5;
 }
