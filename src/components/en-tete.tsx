@@ -21,6 +21,9 @@ export function EnTete() {
           <Link href="/ged" className="rounded-md px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800">
             Import GED
           </Link>
+          <Link href="/mode-d-emploi" className="rounded-md px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800">
+            Mode d&apos;emploi
+          </Link>
           <Link href="/outils/ocr" className="rounded-md px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800">
             Banc d&apos;essai OCR
           </Link>

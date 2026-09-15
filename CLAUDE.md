@@ -30,7 +30,8 @@ Dans un shell non interactif : `export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"
 ## 3. Structure du dépôt
 
 ```
-src/app/page.tsx                       Accueil, dossiers en cours, parcours
+src/app/page.tsx                       Page d'accueil : bienvenue, boutons « Entrer » et « Mode d'emploi », dossiers en cours, parcours
+src/app/mode-d-emploi/page.tsx         Mode d'emploi complet (9 sections), alimenté par les données et paramètres du code
 src/app/ged/page.tsx                   Import GED (composant import-ged)
 src/app/dossiers/[id]/layout.tsx       Bandeau du dossier + fil des étapes (404 si id inconnu)
 src/app/dossiers/[id]/{decoupage,extraction,conformite,decision,export}/page.tsx
