@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LIBELLES_CRITERE, type CandidatSolis } from "@/data/solis";
 import { Alerte, Badge, Bouton, Carte, Chargement } from "@/components/ui";
 import { identiteLue } from "@/lib/dossier-utils";
@@ -16,8 +16,7 @@ export function RapprochementUsager({ id }: { id: string }) {
   const dossier = useDossierStore((s) => s.dossiers[id]);
   const definirRapprochement = useDossierStore((s) => s.definirRapprochement);
   const confirmerRapprochement = useDossierStore((s) => s.confirmerRapprochement);
-  const [enCours, setEnCours] = useState(false);
-  const [erreur, setErreur] = useState<string | null>(null);
+  const [erreur, setErreur] = useState<{ cle: string; message: string } | null>(null);
   const derniereCle = useRef<string | null>(null);
 
   const identite = dossier ? identiteLue(dossier) : null;
@@ -25,33 +24,33 @@ export function RapprochementUsager({ id }: { id: string }) {
   const nomNaissance = identite?.nomNaissance ?? null;
   const nomUsage = identite?.nomUsage ?? null;
   const dateNaissance = identite?.dateNaissance ?? null;
-  const criteres = useMemo(() => (identite ? { nir, nomNaissance, nomUsage, dateNaissance } : null), [identite, nir, nomNaissance, nomUsage, dateNaissance]);
-  const cle = criteres ? JSON.stringify(criteres) : null;
+  const identiteDisponible = Boolean(nir || (nomNaissance && dateNaissance));
+  // La clé texte des critères est le seul déclencheur de la recherche : elle ne
+  // change que si une valeur d'identité change, pas à chaque rendu.
+  const cle = identiteDisponible ? JSON.stringify({ nir, nomNaissance, nomUsage, dateNaissance }) : null;
   const rapprochement = dossier?.rapprochement;
-  const aJour = rapprochement && JSON.stringify(rapprochement.criteres) === cle;
-  const identiteDisponible = Boolean(criteres && (criteres.nir || (criteres.nomNaissance && criteres.dateNaissance)));
+  const aJour = Boolean(rapprochement && cle && JSON.stringify(rapprochement.criteres) === cle);
+  const erreurCourante = erreur && erreur.cle === cle ? erreur.message : null;
+  const enCours = Boolean(cle) && !aJour && !erreurCourante;
 
   useEffect(() => {
-    if (!criteres || !cle || !identiteDisponible || aJour || derniereCle.current === cle) return;
+    if (!cle || aJour || derniereCle.current === cle) return;
     derniereCle.current = cle;
-    let annule = false;
-    setEnCours(true);
-    setErreur(null);
+    const criteres = JSON.parse(cle) as { nir: string | null; nomNaissance: string | null; nomUsage: string | null; dateNaissance: string | null };
     fetch("/api/solis", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "rechercher", ...criteres }) })
       .then(async (r) => {
         if (!r.ok) throw new Error(`Solis a répondu ${r.status}`);
         return (await r.json()) as { candidats: CandidatSolis[] };
       })
       .then((data) => {
-        if (annule) return;
+        setErreur(null);
         definirRapprochement(id, { criteres, candidats: data.candidats, rechercheLe: new Date().toISOString() });
       })
-      .catch((e: unknown) => !annule && setErreur(e instanceof Error ? e.message : "Connexion à Solis impossible"))
-      .finally(() => !annule && setEnCours(false));
-    return () => {
-      annule = true;
-    };
-  }, [criteres, cle, identiteDisponible, aJour, id, definirRapprochement]);
+      .catch((e: unknown) => {
+        derniereCle.current = null;
+        setErreur({ cle, message: e instanceof Error ? e.message : "Connexion à Solis impossible" });
+      });
+  }, [cle, aJour, id, definirRapprochement]);
 
   if (!dossier || !identite) return null;
 
@@ -67,6 +66,7 @@ export function RapprochementUsager({ id }: { id: string }) {
           disabled={enCours || !identiteDisponible}
           onClick={() => {
             derniereCle.current = null;
+            setErreur(null);
             definirRapprochement(id, { criteres: { nir: null, nomNaissance: null, nomUsage: null, dateNaissance: null }, candidats: [], rechercheLe: "" });
           }}
         >
@@ -81,10 +81,12 @@ export function RapprochementUsager({ id }: { id: string }) {
 
       {!identiteDisponible ? (
         <Alerte teinte="attention">Renseignez au moins le NIR, ou le nom de naissance et la date de naissance, pour lancer la recherche.</Alerte>
-      ) : enCours || !aJour ? (
+      ) : erreurCourante ? (
+        <Alerte teinte="danger" titre="Recherche impossible">
+          {erreurCourante} — utilisez « Relancer la recherche ».
+        </Alerte>
+      ) : enCours ? (
         <Chargement texte="Recherche dans Solis…" />
-      ) : erreur ? (
-        <Alerte teinte="danger" titre="Recherche impossible">{erreur}</Alerte>
       ) : decision ? (
         <div className="flex flex-wrap items-center gap-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
           {decision.type === "existant" ? (
