@@ -6,7 +6,7 @@ import { RapprochementUsager } from "@/components/rapprochement-usager";
 import { Alerte, Badge, Bouton, Carte, Chargement, ScoreConfiance, Titre, useMonte } from "@/components/ui";
 import { VisionneusePdf } from "@/components/visionneuse-pdf";
 import { LIBELLES_PIECES, TYPES_EXTRAITS, type Piece } from "@/lib/decoupage";
-import { markdownPiece, pagePourChamp, pagesMasquees } from "@/lib/dossier-utils";
+import { markdownPiece, pagePourChamp } from "@/lib/dossier-utils";
 import { aplatirChamps, CHAMPS_CRITIQUES, estChampCritique, libelleValeur, optionsChamp } from "@/lib/extraction/schemas";
 import { useDossierStore, type EtatDossier, type ExtractionPiece } from "@/store/dossier-store";
 
@@ -100,7 +100,6 @@ export function EtapeExtraction({ id }: { id: string }) {
   const rapprochementConfirme = Boolean(dossier.rapprochement?.decision);
   const pretAValider = toutExtrait && !extractionEnCours && toutVerifie(dossier, piecesAExtraire) && rapprochementConfirme;
   const pageAffichee = page ?? piece.pages[0];
-  const medicale = piece.type === "certificat_medical";
 
   function valider() {
     validerExtraction(id);
@@ -155,8 +154,8 @@ export function EtapeExtraction({ id }: { id: string }) {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-        <Carte titre="Document" sousTitre={medicale ? "Certificat médical : pages sous pli cacheté" : "Cliquez sur un champ pour afficher sa page"} className="xl:sticky xl:top-4 xl:self-start">
-          <VisionneusePdf chemin={dossier.cheminPdf} page={pageAffichee} nbPages={dossier.nbPages} onPage={setPage} pagesMasquees={pagesMasquees(dossier)} hauteur="h-[60vh]" />
+        <Carte titre="Document" sousTitre="Cliquez sur un champ pour afficher sa page" className="xl:sticky xl:top-4 xl:self-start">
+          <VisionneusePdf chemin={dossier.cheminPdf} page={pageAffichee} nbPages={dossier.nbPages} onPage={setPage} hauteur="h-[60vh]" />
         </Carte>
 
         <div className="flex flex-col gap-6">
@@ -188,12 +187,6 @@ export function EtapeExtraction({ id }: { id: string }) {
               </div>
             }
           >
-            {medicale ? (
-              <Alerte teinte="attention" titre="Secret médical">
-                Le certificat est remis sous pli cacheté. Seuls l&apos;identité du patient, la date, le lieu et le médecin sont contrôlés ici ; le contenu
-                médical est transmis tel quel à l&apos;équipe médico-sociale.
-              </Alerte>
-            ) : null}
             {enCours.has(piece.id) ? <Chargement texte="Extraction structurée en cours…" /> : null}
             {extraction?.erreur ? <Alerte teinte="danger" titre="Extraction impossible">{extraction.erreur}</Alerte> : null}
 

@@ -1,10 +1,11 @@
 "use client";
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
 import type { CandidatSolis } from "@/data/solis";
 import type { TypeCourrier } from "@/lib/courriers";
 import type { PageClassee, Piece, TypePiece } from "@/lib/decoupage";
+import { ETAPES as DESCRIPTION_ETAPES } from "@/lib/etapes";
 import type { ResultatConformite } from "@/lib/regles/conformite";
 import type { Orientation, ResultatDecision } from "@/lib/regles/decision";
 import type { StatutDossier } from "@/lib/statuts";
@@ -17,13 +18,8 @@ import type { StatutDossier } from "@/lib/statuts";
 
 export type Etape = "decoupage" | "extraction" | "conformite" | "decision" | "export" | "termine";
 
-export const ETAPES: Array<{ id: Etape; libelle: string; numero: number }> = [
-  { id: "decoupage", libelle: "Typage des pièces", numero: 1 },
-  { id: "extraction", libelle: "Contrôle des données", numero: 2 },
-  { id: "conformite", libelle: "Complétude et recevabilité", numero: 3 },
-  { id: "decision", libelle: "Pré-instruction", numero: 4 },
-  { id: "export", libelle: "Enregistrement et transmission", numero: 5 },
-];
+/** Les cinq étapes, décrites dans src/lib/etapes.ts. */
+export const ETAPES = DESCRIPTION_ETAPES;
 
 export type PageOcr = { index: number; markdown: string };
 
@@ -66,7 +62,7 @@ export type DecisionAgent = {
   valideLe?: string;
 };
 
-export type DocumentRetourGed = { pieceId: string; type: TypePiece; pages: number[]; confidentiel: boolean };
+export type DocumentRetourGed = { pieceId: string; type: TypePiece; pages: number[] };
 
 export type ExportSolis = {
   action: "cree" | "rattache" | "mis_a_jour";
@@ -111,8 +107,6 @@ type Actions = {
   supprimerDossier: (id: string) => void;
   journaliser: (id: string, evenement: Omit<EvenementJournal, "horodatage">) => void;
   definirOcr: (id: string, ocr: EtatDossier["ocr"]) => void;
-  /** Remplace le texte des pages (rédaction du secret médical), sans journal. */
-  redigerPagesOcr: (id: string, pages: PageOcr[]) => void;
   definirDecoupage: (id: string, pagesClassees: PageClassee[], pieces: Piece[], motif?: string) => void;
   validerDecoupage: (id: string) => void;
   definirExtraction: (id: string, extraction: ExtractionPiece) => void;
@@ -130,6 +124,29 @@ type Actions = {
 };
 
 type Store = { dossiers: Record<string, EtatDossier> } & Actions;
+
+const CLE_STOCKAGE = "solidia-dossiers";
+const CLE_ANCIENNE = "instructocr-dossiers";
+
+/**
+ * Stockage navigateur qui reprend les dossiers enregistrés sous l'ancien nom de
+ * l'outil, pour ne pas perdre le travail en cours lors du renommage.
+ */
+const stockageAvecReprise = {
+  getItem: (nom: string) => {
+    if (typeof localStorage === "undefined") return null;
+    return localStorage.getItem(nom) ?? localStorage.getItem(CLE_ANCIENNE);
+  },
+  setItem: (nom: string, valeur: string) => {
+    if (typeof localStorage === "undefined") return;
+    localStorage.setItem(nom, valeur);
+    localStorage.removeItem(CLE_ANCIENNE);
+  },
+  removeItem: (nom: string) => {
+    if (typeof localStorage === "undefined") return;
+    localStorage.removeItem(nom);
+  },
+};
 
 const maintenant = () => new Date().toISOString();
 
@@ -177,7 +194,6 @@ export const useDossierStore = create<Store>()(
         journaliser: (id, e) => modifier(id, (d) => avecJournal(d, { ...e, horodatage: maintenant() })),
         definirOcr: (id, ocr) =>
           modifier(id, (d) => avecJournal({ ...d, ocr }, evenement("import", "OCR terminé", ocr ? `${ocr.pages.length} pages, ${ocr.modele}, ${(ocr.dureeMs / 1000).toFixed(1)} s` : undefined))),
-        redigerPagesOcr: (id, pages) => modifier(id, (d) => (d.ocr ? { ...d, ocr: { ...d.ocr, pages } } : d)),
         definirDecoupage: (id, pagesClassees, pieces, motif) =>
           modifier(id, (d) => {
             const suivant = { ...d, pagesClassees, pieces };
@@ -290,8 +306,9 @@ export const useDossierStore = create<Store>()(
       };
     },
     {
-      name: "instructocr-dossiers",
+      name: CLE_STOCKAGE,
       version: 2,
+      storage: createJSONStorage(() => stockageAvecReprise),
       migrate: (etat) => {
         // Complète les dossiers enregistrés par une version antérieure.
         const s = etat as { dossiers?: Record<string, Partial<EtatDossier>> };

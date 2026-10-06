@@ -40,7 +40,7 @@ export function EtapeExport({ id }: { id: string }) {
   const nir = lecteurDepuisDossier(dossier)("cerfa_formulaire", "demandeur.nir");
   const documents: DocumentRetourGed[] = (dossier.pieces ?? [])
     .filter((p) => !TYPES_A_ECARTER.includes(p.type))
-    .map((p) => ({ pieceId: p.id, type: p.type, pages: p.pages, confidentiel: p.type === "certificat_medical" }));
+    .map((p) => ({ pieceId: p.id, type: p.type, pages: p.pages }));
 
   async function enregistrer() {
     if (!dossier) return;
@@ -201,7 +201,6 @@ export function EtapeExport({ id }: { id: string }) {
               <li key={d.pieceId} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 px-3 py-2">
                 <span>
                   {LIBELLES_PIECES[d.type]} <span className="text-xs text-slate-500">p. {d.pages.join(", ")}</span>
-                  {d.confidentiel ? <Badge teinte="attention" className="ml-2">confidentiel, EMS seulement</Badge> : null}
                 </span>
                 <a
                   href={`/api/dossiers/${dossier.id}/pieces?pages=${d.pages.join(",")}&nom=${slug(LIBELLES_PIECES[d.type])}`}
@@ -215,8 +214,8 @@ export function EtapeExport({ id }: { id: string }) {
             ))}
           </ul>
           <p className="mt-3 text-xs text-slate-500">
-            Chaque pièce est indexée dans la GED avec le numéro d&apos;enregistrement{dossier.export ? `, le numéro de demande ${dossier.export.numeroDossier}` : ""} et son type. Le
-            certificat médical est déposé avec un accès restreint à l&apos;équipe médico-sociale.
+            Chaque pièce est indexée dans la GED avec le numéro d&apos;enregistrement{dossier.export ? `, le numéro de demande ${dossier.export.numeroDossier}` : ""} et son type,
+            sous l&apos;usager, de sorte qu&apos;elle soit retrouvable depuis sa fiche.
           </p>
         </Carte>
       </div>

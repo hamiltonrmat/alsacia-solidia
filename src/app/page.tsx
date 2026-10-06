@@ -1,31 +1,25 @@
 import Link from "next/link";
-import { DossiersEnCours } from "@/components/dossiers-en-cours";
-
-const ETAPES = [
-  { n: 1, titre: "Import GED", texte: "Choix du lot de numérisation et du dossier à instruire, OCR immédiat." },
-  { n: 2, titre: "Typage des pièces", texte: "Chaque page est reconnue et regroupée en pièces : CERFA, CNI, RIB, certificat mis sous pli…" },
-  { n: 3, titre: "Contrôle des données", texte: "Les champs sont extraits en regard du document, l'agent vérifie les champs critiques et rapproche l'usager." },
-  { n: 4, titre: "Complétude et recevabilité", texte: "Pièces obligatoires, validité, cohérence : recevable ou non, délais et courrier à l'usager." },
-  { n: 5, titre: "Pré-instruction", texte: "Les règles administratives proposent une orientation, l'agent la retient." },
-  { n: 6, titre: "Enregistrement et transmission", texte: "La demande est enregistrée dans Solis avec son statut, transmise, les pièces déposées dans la GED." },
-];
+import { ApercuBannette } from "@/components/bannette";
+import { ETAPES } from "@/lib/etapes";
+import { MARQUE } from "@/lib/marque";
+import { MODULES } from "@/lib/modules";
 
 const CARACTERISTIQUES = [
   {
-    titre: "Lecture OCR de qualité",
-    texte: "Les dossiers numérisés sont lus par Mistral OCR, page par page, y compris les cases cochées et les tableaux.",
+    titre: "Lecture automatique des dossiers",
+    texte: "Chaque page du courrier numérisé est lue, reconnue et rattachée à la bonne pièce : formulaire, pièce d'identité, RIB, avis d'imposition, certificat médical.",
   },
   {
     titre: "Extraction expliquée",
-    texte: "Chaque champ affiche son score de confiance et l'extrait du texte d'où il vient. Rien n'est caché à l'agent.",
+    texte: "Chaque champ affiche son score de confiance et l'extrait du document d'où il vient, à côté de l'image de la page. Rien n'est caché à l'agent.",
   },
   {
-    titre: "Contrôles lisibles",
-    texte: "Chaque contrôle de complétude et chaque règle de pré-instruction est formulé en français, avec son verdict et son motif. Chaque action de l'agent est journalisée.",
+    titre: "Contrôles et règles lisibles",
+    texte: "Complétude, cohérence entre pièces, délais, règles d'orientation : chaque verdict est formulé en français avec son motif, et chaque action est journalisée.",
   },
   {
     titre: "Démonstration sans risque",
-    texte: "Six dossiers fictifs couvrent les cas courants et les pièges. Aucune donnée réelle, GED et Solis sont simulés.",
+    texte: "Six dossiers fictifs couvrent les cas courants et les pièges. Aucune donnée réelle : la GED et le logiciel métier sont simulés.",
   },
 ];
 
@@ -41,14 +35,20 @@ export default function Accueil() {
           <div className="flex flex-col gap-6">
             <span className="inline-flex w-fit items-center gap-2 rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wider text-blue-700">
               <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
-              Prototype v2 · démonstration
+              {MARQUE.version} · démonstration
             </span>
-            <h1 className="text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">
-              Bienvenue sur <span className="text-blue-600">InstructOCR</span>
-            </h1>
-            <p className="max-w-xl text-lg text-slate-600">
-              L&apos;assistant d&apos;instruction des dossiers d&apos;aide à l&apos;autonomie. Le dossier numérisé est lu, découpé,
-              contrôlé et orienté en quelques minutes, sous le regard de l&apos;agent qui garde la main à chaque étape.
+            <div className="flex flex-col gap-3">
+              <h1 className="text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">
+                {MARQUE.nomDebut}
+                <span className="text-blue-600">{MARQUE.nomFin}</span>
+              </h1>
+              <p className="text-lg font-medium text-slate-700">
+                {MARQUE.accroche} de la {MARQUE.collectivite}
+              </p>
+            </div>
+            <p className="max-w-xl text-slate-600">
+              Du courrier numérisé au logiciel métier : le dossier est lu, découpé en pièces, contrôlé, rapproché de l&apos;usager et orienté en
+              quelques minutes, sous le regard de l&apos;agent qui garde la main à chaque étape.
             </p>
             <div className="flex flex-wrap gap-3">
               <Link
@@ -66,11 +66,11 @@ export default function Accueil() {
               </Link>
             </div>
             <p className="text-sm text-slate-500">
-              Première visite ? Le mode d&apos;emploi présente la plateforme, le parcours d&apos;un dossier et la lecture des indicateurs.
+              Première visite ? Le mode d&apos;emploi présente les trois modules, le parcours d&apos;un dossier et la lecture des indicateurs.
             </p>
           </div>
 
-          {/* Illustration : un dossier qui traverse les étapes */}
+          {/* Illustration : un dossier en cours de traitement */}
           <div className="relative mx-auto w-full max-w-sm" aria-hidden>
             <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-lg">
               <div className="flex items-center justify-between">
@@ -103,19 +103,50 @@ export default function Accueil() {
               </div>
             </div>
             <div className="absolute -bottom-4 -right-4 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-md">
-              <p className="font-medium text-slate-800">6 étapes · 30 secondes d&apos;OCR</p>
+              <p className="font-medium text-slate-800">3 modules · 5 étapes</p>
               <p className="text-slate-500">L&apos;agent valide chaque étape</p>
             </div>
           </div>
         </div>
       </section>
 
-      <DossiersEnCours />
+      {/* Les trois modules */}
+      <section className="flex flex-col gap-5">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-2xl font-semibold tracking-tight">Les trois modules</h2>
+          <p className="text-slate-600">
+            L&apos;outil suit le chemin réel d&apos;un dossier : il arrive dans la gestion documentaire, il est traité, puis il est enregistré dans le
+            logiciel métier.
+          </p>
+        </div>
+        <ol className="grid gap-4 md:grid-cols-3">
+          {MODULES.map((m) => (
+            <li key={m.id} className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center gap-3">
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-lg ring-1 ring-blue-100" aria-hidden>
+                  {m.icone}
+                </span>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-blue-600">Module {m.numero}</p>
+                  <p className="font-semibold text-slate-900">{m.libelle}</p>
+                </div>
+              </div>
+              <p className="text-sm font-medium text-slate-700">{m.sousTitre}</p>
+              <p className="flex-1 text-sm text-slate-600">{m.description}</p>
+              <Link href={m.chemin} className="text-sm font-semibold text-blue-700 hover:underline">
+                Ouvrir le module {m.libelle} →
+              </Link>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <ApercuBannette />
 
       {/* Caractéristiques */}
       <section className="flex flex-col gap-5">
         <div className="flex flex-col gap-1">
-          <h2 className="text-2xl font-semibold tracking-tight">Ce que la plateforme apporte</h2>
+          <h2 className="text-2xl font-semibold tracking-tight">Ce que l&apos;outil apporte</h2>
           <p className="text-slate-600">Un poste de travail qui prépare l&apos;instruction sans jamais décider à la place de l&apos;agent.</p>
         </div>
         <ul className="grid gap-4 sm:grid-cols-2">
@@ -128,20 +159,20 @@ export default function Accueil() {
         </ul>
       </section>
 
-      {/* Parcours */}
+      {/* Les étapes du module de traitement */}
       <section className="flex flex-col gap-5">
         <div className="flex flex-col gap-1">
-          <h2 className="text-2xl font-semibold tracking-tight">Le parcours d&apos;un dossier</h2>
-          <p className="text-slate-600">Six étapes, dans l&apos;ordre. Chacune s&apos;appuie sur la précédente et reste modifiable.</p>
+          <h2 className="text-2xl font-semibold tracking-tight">Les cinq étapes du traitement</h2>
+          <p className="text-slate-600">Dans le module Dossiers, chaque dossier suit ce parcours, dans l&apos;ordre, et reste modifiable.</p>
         </div>
-        <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {ETAPES.map((e) => (
-            <li key={e.n} className="flex gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">{e.n}</span>
-              <div>
-                <p className="font-semibold text-slate-900">{e.titre}</p>
-                <p className="mt-1 text-sm text-slate-600">{e.texte}</p>
-              </div>
+            <li key={e.id} className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
+                {e.numero}
+              </span>
+              <p className="font-semibold text-slate-900">{e.libelle}</p>
+              <p className="text-sm text-slate-600">{e.resume}</p>
             </li>
           ))}
         </ol>

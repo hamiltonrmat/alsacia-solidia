@@ -2,9 +2,9 @@
  * Test de bout en bout du pipeline de pré-instruction, en ligne de commande.
  *
  * Enchaîne contre un serveur de développement en cours d'exécution :
- * OCR du dossier → typage des pièces (avec mise sous pli du certificat
- * médical) → extraction de chaque pièce → rapprochement usager → complétude
- * → pré-instruction. Affiche les résultats clés et enregistre le détail.
+ * OCR du dossier → typage des pièces → extraction de chaque pièce →
+ * rapprochement usager → complétude → pré-instruction. Affiche les résultats
+ * clés et enregistre le détail.
  *
  * Lancer : npm run dev (dans un terminal) puis
  *          npx tsx scripts/tester-pipeline.ts D-2026-0305 [http://localhost:3000] [sortie.json]
@@ -17,7 +17,6 @@ import { classerPages, LIBELLES_PIECES, regrouperEnPieces, TYPES_A_ECARTER, TYPE
 import { aplatirChamps } from "../src/lib/extraction/schemas";
 import { evaluerConformite, type Lecteur } from "../src/lib/regles/conformite";
 import { evaluerDecision } from "../src/lib/regles/decision";
-import { appliquerSecretMedical, MARQUEUR_PLI_CACHETE } from "../src/lib/secret-medical";
 
 const [, , dossierId = "D-2026-0305", base = "http://localhost:3000", sortie] = process.argv;
 
@@ -45,12 +44,10 @@ async function main() {
   const ocr = await poster<{ pages: Array<{ index: number; markdown: string }>; modele: string; dureeMs: number }>(`/api/dossiers/${dossierId}/ocr`);
   console.log(`\n[OCR] ${ocr.pages.length} pages en ${(ocr.dureeMs / 1000).toFixed(1)} s (${ocr.modele})`);
 
-  // 2. Typage des pièces et secret médical
+  // 2. Typage des pièces
   const pagesClassees = classerPages(ocr.pages);
   const pieces = regrouperEnPieces(pagesClassees);
-  const pagesRedigees = appliquerSecretMedical(ocr.pages, pagesClassees);
-  const nbRedigees = pagesRedigees.filter((p) => p.markdown.includes(MARQUEUR_PLI_CACHETE)).length;
-  console.log(`\n[Typage] ${pieces.length} pièces, ${nbRedigees} page(s) mise(s) sous pli`);
+  console.log(`\n[Typage] ${pieces.length} pièces`);
   for (const p of pieces) {
     console.log(`  ${LIBELLES_PIECES[p.type].padEnd(46)} p. ${p.pages.join(",").padEnd(12)} confiance ${(p.confiance * 100).toFixed(0)} %${TYPES_A_ECARTER.includes(p.type) ? "  (écartée)" : ""}`);
   }
@@ -60,7 +57,7 @@ async function main() {
   console.log("\n[Extraction]");
   for (const piece of pieces.filter((p: Piece) => TYPES_EXTRAITS.includes(p.type))) {
     if (extractions.has(piece.type)) continue;
-    const markdown = piece.pages.map((n) => `<!-- page ${n} -->\n${pagesRedigees[n - 1].markdown}`).join("\n\n");
+    const markdown = piece.pages.map((n) => `<!-- page ${n} -->\n${ocr.pages[n - 1].markdown}`).join("\n\n");
     const t0 = Date.now();
     const res = await poster<{ modele: string; champs: Record<string, unknown>; usage: { promptTokens: number; completionTokens: number } }>("/api/extraction", { type: piece.type, markdown });
     extractions.set(piece.type, res.champs);
@@ -110,7 +107,7 @@ async function main() {
   if (extractions.has("cni")) console.log(`  CNI : ${lire("cni", "nom")} ${lire("cni", "prenoms")}, née ${lire("cni", "date_naissance")}, expire ${lire("cni", "date_expiration")}`);
   if (extractions.has("rib")) console.log(`  RIB : ${lire("rib", "titulaire")} — ${lire("rib", "iban")}`);
   if (extractions.has("avis_imposition")) console.log(`  Avis : ${lire("avis_imposition", "declarant_1")} / ${lire("avis_imposition", "declarant_2") ?? "-"}, revenus ${lire("avis_imposition", "annee_revenus")}, RFR ${lire("avis_imposition", "revenu_fiscal_reference")}`);
-  if (extractions.has("certificat_medical")) console.log(`  CM (volet administratif) : ${lire("certificat_medical", "patient.nom_naissance")}, ${lire("certificat_medical", "date")}, ${lire("certificat_medical", "medecin_nom")}`);
+  if (extractions.has("certificat_medical")) console.log(`  CM : ${lire("certificat_medical", "patient.nom_naissance")}, ${lire("certificat_medical", "date")}, ${lire("certificat_medical", "medecin_nom")}, transferts=${lire("certificat_medical", "evaluation.transferts")}, toilette=${lire("certificat_medical", "evaluation.toilette")}`);
 
   // 4. Rapprochement usager
   const solis = await poster<{ candidats: CandidatSolis[] }>("/api/solis", {
@@ -144,10 +141,11 @@ async function main() {
   const decision = evaluerDecision({ pieces, lire, dateReception: fictif.dateReception, recevabilite: conformite.recevabilite });
   console.log(`\n[Pré-instruction] ${decision.orientation} — ${decision.recommandation}`);
   for (const r of decision.regles) console.log(`  ${r.statut.padEnd(13)} ${r.libelle} — ${r.detail}`);
+  if (decision.girEstime) console.log(`  GIR estimé ${decision.girEstime.gir} (${decision.girEstime.libelle})`);
   console.log(`\nDurée totale ${((Date.now() - debut) / 1000).toFixed(0)} s`);
 
   if (sortie) {
-    writeFileSync(sortie, JSON.stringify({ ocr: { ...ocr, pages: pagesRedigees }, pagesClassees, pieces, extractions: Object.fromEntries(extractions), solis, conformite, decision }, null, 2));
+    writeFileSync(sortie, JSON.stringify({ ocr, pagesClassees, pieces, extractions: Object.fromEntries(extractions), solis, conformite, decision }, null, 2));
     console.log(`Détail enregistré dans ${sortie}`);
   }
 }

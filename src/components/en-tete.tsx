@@ -1,30 +1,70 @@
-import Link from "next/link";
+"use client";
 
-/** Barre de navigation principale. */
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { MARQUE } from "@/lib/marque";
+import { MODULES } from "@/lib/modules";
+
+/**
+ * Barre de navigation principale : le logotype, les trois modules de l'outil,
+ * puis les pages d'appui (mode d'emploi, outils).
+ */
 export function EnTete() {
+  const pathname = usePathname() ?? "/";
+
   return (
-    <header className="border-b border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
-      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
-        <Link href="/" className="flex items-center gap-2">
-          <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-blue-600 text-xs font-bold text-white">IO</span>
-          <span className="text-lg font-semibold tracking-tight">
-            Instruct<span className="text-blue-600">OCR</span>
+    <header className="border-b border-slate-200 bg-white shadow-sm">
+      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 sm:px-6">
+        <Link href="/" className="flex items-center gap-2.5">
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-sky-500 text-base font-bold text-white shadow-sm">
+            S
           </span>
-          <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-200">
-            Prototype APA
+          <span className="flex flex-col leading-tight">
+            <span className="text-lg font-semibold tracking-tight text-slate-900">
+              {MARQUE.nomDebut}
+              <span className="text-blue-600">{MARQUE.nomFin}</span>
+            </span>
+            <span className="hidden text-[11px] text-slate-500 sm:block">{MARQUE.collectivite}</span>
           </span>
         </Link>
-        <nav className="flex items-center gap-1 text-sm">
-          <Link href="/" className="rounded-md px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800">
-            Accueil
-          </Link>
-          <Link href="/ged" className="rounded-md px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800">
-            Import GED
-          </Link>
-          <Link href="/mode-d-emploi" className="rounded-md px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800">
+
+        <nav aria-label="Modules" className="flex flex-wrap items-center gap-1">
+          {MODULES.map((m) => {
+            const actif = pathname === m.chemin || pathname.startsWith(`${m.chemin}/`);
+            return (
+              <Link
+                key={m.id}
+                href={m.chemin}
+                aria-current={actif ? "page" : undefined}
+                title={m.sousTitre}
+                className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium transition ${
+                  actif ? "border-blue-600 bg-blue-600 text-white shadow-sm" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                <span
+                  className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold ${
+                    actif ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
+                  }`}
+                >
+                  {m.numero}
+                </span>
+                {m.libelle}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <nav aria-label="Aide et outils" className="ml-auto flex items-center gap-1 text-sm">
+          <Link
+            href="/mode-d-emploi"
+            className={`rounded-md px-3 py-1.5 transition hover:bg-slate-100 ${pathname.startsWith("/mode-d-emploi") ? "font-medium text-blue-700" : "text-slate-600"}`}
+          >
             Mode d&apos;emploi
           </Link>
-          <Link href="/outils/ocr" className="rounded-md px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800">
+          <Link
+            href="/outils/ocr"
+            className={`rounded-md px-3 py-1.5 transition hover:bg-slate-100 ${pathname.startsWith("/outils") ? "font-medium text-blue-700" : "text-slate-600"}`}
+          >
             Banc d&apos;essai OCR
           </Link>
         </nav>

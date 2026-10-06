@@ -3,17 +3,17 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { DossierGed, LotGedAvecDossiers } from "@/app/api/ged/lots/route";
-import { cheminEtape, libelleEtape } from "@/components/dossiers-en-cours";
-import { Alerte, Badge, Bouton, Carte, Chargement, Titre, useMonte } from "@/components/ui";
+import { BandeauModule } from "@/components/bandeau-module";
+import { cheminEtape, libelleEtape } from "@/components/bannette";
+import { Alerte, Badge, Bouton, Carte, Chargement, useMonte } from "@/components/ui";
 import { classerPages, regrouperEnPieces } from "@/lib/decoupage";
-import { appliquerSecretMedical } from "@/lib/secret-medical";
 import { LIBELLES_STATUT, TEINTES_STATUT } from "@/lib/statuts";
 import { useDossierStore } from "@/store/dossier-store";
 
 type EtatImport = { id: string; message: string } | null;
 
-/** Page d'import : connexion à la GED simulée, choix du lot et du dossier, OCR. */
-export function ImportGed() {
+/** Module GED : connexion à la GED simulée, choix du lot et du dossier, prise en charge. */
+export function ModuleGed() {
   const router = useRouter();
   const monte = useMonte();
   const [lots, setLots] = useState<LotGedAvecDossiers[] | null>(null);
@@ -47,7 +47,7 @@ export function ImportGed() {
 
   async function importer(lot: LotGedAvecDossiers, dossier: DossierGed) {
     setErreur(null);
-    setImportEnCours({ id: dossier.id, message: "Transfert du PDF depuis la GED…" });
+    setImportEnCours({ id: dossier.id, message: "Transfert du document depuis la GED…" });
     importerDossier({
       id: dossier.id,
       lotId: lot.id,
@@ -61,10 +61,9 @@ export function ImportGed() {
       const reponse = await fetch(`/api/dossiers/${dossier.id}/ocr`, { method: "POST" });
       const data = (await reponse.json()) as { pages: Array<{ index: number; markdown: string }>; modele: string; dureeMs: number } | { error: string };
       if (!reponse.ok || "error" in data) throw new Error("error" in data ? data.error : `Erreur ${reponse.status}`);
-      setImportEnCours({ id: dossier.id, message: "Typage des pages et mise sous pli du certificat médical…" });
+      setImportEnCours({ id: dossier.id, message: "Typage des pages…" });
       const pagesClassees = classerPages(data.pages);
-      // Le contenu médical est retiré du texte conservé avant tout affichage.
-      definirOcr(dossier.id, { ...data, pages: appliquerSecretMedical(data.pages, pagesClassees) });
+      definirOcr(dossier.id, data);
       definirDecoupage(dossier.id, pagesClassees, regrouperEnPieces(pagesClassees));
       router.push(`/dossiers/${dossier.id}/decoupage`);
     } catch (e) {
@@ -78,10 +77,13 @@ export function ImportGed() {
 
   return (
     <main className="flex flex-col gap-6">
-      <Titre
-        surtitre="Étape préalable"
-        titre="Import depuis la GED"
-        description="Les dossiers numérisés arrivent par lots. Sélectionnez un lot, puis chargez le dossier à traiter : il reçoit un numéro d'enregistrement, l'OCR démarre aussitôt et le dossier entre dans la bannette du poste de travail."
+      <BandeauModule
+        id="ged"
+        actions={
+          <Bouton variante="secondaire" href="/dossiers">
+            Voir la bannette
+          </Bouton>
+        }
       />
 
       {erreur ? <Alerte teinte="danger" titre="Erreur">{erreur}</Alerte> : null}
@@ -164,7 +166,7 @@ export function ImportGed() {
                           </Bouton>
                         ) : null}
                         <Bouton onClick={() => importer(lot, d)} disabled={importEnCours !== null || !d.tailleKo}>
-                          {enImport ? "Import en cours…" : enPoste ? "Réimporter et relancer l'OCR" : "Importer et lancer l'OCR"}
+                          {enImport ? "Prise en charge en cours…" : enPoste ? "Reprendre à zéro (nouvel OCR)" : "Prendre en charge et lire le dossier"}
                         </Bouton>
                         {enImport ? <Chargement texte={importEnCours?.message} /> : null}
                       </div>

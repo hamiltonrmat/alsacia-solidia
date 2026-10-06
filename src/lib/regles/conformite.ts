@@ -370,7 +370,7 @@ export function evaluerConformite(entree: EntreeConformite): ResultatConformite 
     }
   }
 
-  // --- Certificat médical (volet administratif uniquement) ----------------
+  // --- Certificat médical -------------------------------------------------
   const nomPatient = lire("certificat_medical", "patient.nom_naissance");
   const dateCmBrute = lire("certificat_medical", "date");
   const medecin = lire("certificat_medical", "medecin_nom");
@@ -379,7 +379,7 @@ export function evaluerConformite(entree: EntreeConformite): ResultatConformite 
   if (cmVierge) {
     ajouter({ id: "presence-cm", libelle: "Certificat médical", statut: "info", detail: "L'annexe « certificat médical » est jointe mais vierge : elle est considérée comme absente (pièce facultative).", piece: "certificat_medical" });
   } else if (present("certificat_medical")) {
-    ajouter({ id: "presence-cm", libelle: "Certificat médical", statut: "ok", detail: "Certificat médical joint, sous pli cacheté : son contenu médical n'est pas lu ici et sera transmis à l'équipe médico-sociale.", piece: "certificat_medical" });
+    ajouter({ id: "presence-cm", libelle: "Certificat médical", statut: "ok", detail: "Certificat médical joint : il sera transmis à l'équipe médico-sociale avec le dossier.", piece: "certificat_medical" });
     const ddnPatient = parserDateFr(lire("certificat_medical", "patient.date_naissance"));
     const ddnCerfa = parserDateFr(dateNaissance);
     const memePersonne = contientNom(nomPatient, nomNaissance, nomUsage) && (!ddnPatient || !ddnCerfa || ddnPatient.getTime() === ddnCerfa.getTime());

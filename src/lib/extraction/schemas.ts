@@ -159,30 +159,11 @@ export const SCHEMA_CERFA_FORMULAIRE = objet({
 });
 
 /**
- * Certificat médical, volet administratif seulement : le contenu médical est
- * sous pli cacheté (voir src/lib/secret-medical.ts) et n'est jamais extrait
- * pour l'agent d'accueil.
+ * Certificat médical (annexe du CERFA, pages 11 à 13) : volet administratif
+ * (identité du patient, date, médecin) et volet médical (pathologies, prises
+ * en charge, mobilité, grille d'évaluation de la perte d'autonomie).
  */
 export const SCHEMA_CERTIFICAT_MEDICAL = objet({
-  patient: objet({
-    nom_naissance: champ("Nom de naissance du patient"),
-    nom_usage: champ("Nom d'usage du patient"),
-    prenoms: champ("Prénom(s) du patient"),
-    date_naissance: champ(`Date de naissance du patient, ${DATE}`),
-    code_postal: champ("Code postal du patient"),
-    commune: champ("Commune du patient"),
-  }),
-  lieu: champ("Fait à (lieu)"),
-  date: champ(`Date du certificat, ${DATE}`),
-  medecin_nom: champ("Nom du médecin (cachet ou signature)"),
-  medecin_rpps: champ("Numéro RPPS du médecin, 11 chiffres"),
-});
-
-/**
- * Certificat médical, volet complet. Réservé à un futur rôle « équipe
- * médico-sociale » : il n'est pas exposé dans l'application de pré-instruction.
- */
-export const SCHEMA_CERTIFICAT_MEDICAL_EMS = objet({
   patient: objet({
     nom_naissance: champ("Nom de naissance du patient"),
     nom_usage: champ("Nom d'usage du patient"),
@@ -289,7 +270,7 @@ export const SCHEMAS_PAR_TYPE: Partial<Record<TypePiece, { nom: string; schema: 
     nom: "cerfa_16301_certificat_medical",
     schema: SCHEMA_CERTIFICAT_MEDICAL,
     consigne:
-      "Le texte est l'annexe « certificat médical » du CERFA 16301*01 dont le contenu médical a été retiré (pli cacheté). N'extrais que l'identité du patient, le lieu, la date et le médecin (cachet ou signature).",
+      "Le texte est l'annexe « certificat médical » du CERFA 16301*01 (pages 11 à 13). Les grilles d'évaluation sont des tableaux Markdown : la colonne marquée donne le niveau (1re colonne = seul, 2e = avec_aide, 3e = non_realise, 4e = nsp). Résume les textes libres (pathologies, prises en charge) sans les tronquer au milieu d'une phrase.",
   },
   cni: { nom: "carte_identite", schema: SCHEMA_CNI, consigne: "Le texte est la photocopie d'une carte nationale d'identité française." },
   rib: { nom: "rib", schema: SCHEMA_RIB, consigne: "Le texte est un relevé d'identité bancaire." },
@@ -579,7 +560,7 @@ export const CHAMPS_CRITIQUES: Partial<Record<TypePiece, string[]>> = {
     "signature.qualite",
     "signature.date",
   ],
-  certificat_medical: ["patient.nom_naissance", "patient.date_naissance", "date"],
+  certificat_medical: ["patient.nom_naissance", "patient.date_naissance", "date", "medecin_nom"],
   cni: ["nom", "prenoms", "date_naissance", "date_expiration"],
   rib: ["titulaire", "iban"],
   avis_imposition: ["declarant_1", "annee_revenus", "revenu_fiscal_reference"],

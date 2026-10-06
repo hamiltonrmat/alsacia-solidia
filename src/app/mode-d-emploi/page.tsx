@@ -3,25 +3,28 @@ import type { ReactNode } from "react";
 import { DOSSIERS_FICTIFS, LOTS_GED } from "@/data/dossiers-fictifs";
 import { ageA, parserDateFr } from "@/lib/dates";
 import { LIBELLES_PIECES, TYPES_A_ECARTER, TYPES_EXTRAITS, type TypePiece } from "@/lib/decoupage";
+import { MARQUE } from "@/lib/marque";
+import { MODULES } from "@/lib/modules";
 import { LIBELLES_ORIENTATION } from "@/lib/regles/decision";
 import { PARAMETRES } from "@/lib/regles/parametres";
 import { LIBELLES_STATUT } from "@/lib/statuts";
 
 export const metadata = {
-  title: "Mode d'emploi — InstructOCR",
-  description: "Présentation de la plateforme, parcours d'un dossier étape par étape, lecture des indicateurs, règles appliquées et questions fréquentes.",
+  title: "Mode d'emploi — Solid'IA",
+  description: "Présentation de l'outil, des trois modules, du parcours d'un dossier étape par étape, de la lecture des indicateurs et des règles appliquées.",
 };
 
 const SOMMAIRE = [
-  { id: "presentation", titre: "1. À quoi sert la plateforme" },
-  { id: "caracteristiques", titre: "2. Caractéristiques" },
-  { id: "parcours", titre: "3. Le parcours pas à pas" },
-  { id: "indicateurs", titre: "4. Lire les indicateurs" },
-  { id: "regles", titre: "5. Les règles appliquées" },
-  { id: "demonstration", titre: "6. Les dossiers de démonstration" },
-  { id: "limites", titre: "7. Limites à connaître" },
-  { id: "faq", titre: "8. Questions fréquentes" },
-  { id: "glossaire", titre: "9. Glossaire" },
+  { id: "presentation", titre: "1. À quoi sert l'outil" },
+  { id: "modules", titre: "2. Les trois modules" },
+  { id: "caracteristiques", titre: "3. Caractéristiques" },
+  { id: "parcours", titre: "4. Le parcours pas à pas" },
+  { id: "indicateurs", titre: "5. Lire les indicateurs" },
+  { id: "regles", titre: "6. Les règles appliquées" },
+  { id: "demonstration", titre: "7. Les dossiers de démonstration" },
+  { id: "limites", titre: "8. Limites à connaître" },
+  { id: "faq", titre: "9. Questions fréquentes" },
+  { id: "glossaire", titre: "10. Glossaire" },
 ];
 
 function Section({ id, titre, children }: { id: string; titre: string; children: ReactNode }) {
@@ -58,9 +61,10 @@ function Pastille({ couleur, children }: { couleur: "vert" | "ambre" | "rouge" |
   return <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${classes}`}>{children}</span>;
 }
 
-type Etape = {
+type EtapeGuide = {
   numero: number;
   titre: string;
+  module: string;
   chemin: string;
   objectif: string;
   ecran: string[];
@@ -68,32 +72,34 @@ type Etape = {
   conseil?: string;
 };
 
-const ETAPES: Etape[] = [
+const ETAPES_GUIDE: EtapeGuide[] = [
   {
-    numero: 1,
-    titre: "Import depuis la GED",
+    numero: 0,
+    titre: "Prise en charge depuis la GED",
+    module: "Module 1 · GED",
     chemin: "/ged",
-    objectif: "Choisir le dossier à traiter parmi les lots de numérisation, l'enregistrer et le charger dans la bannette du poste de travail.",
+    objectif: "Choisir le dossier à traiter parmi les lots de numérisation, l'enregistrer et le faire entrer dans la bannette du poste de travail.",
     ecran: [
       "À gauche, les lots de numérisation avec leur date, leur origine (scanner, courrier) et leur nombre de dossiers.",
-      "À droite, les dossiers du lot : identifiant, libellé donné par la GED, date de réception, nombre de pages, taille du PDF.",
-      "Un badge indique le statut métier du dossier dans votre poste (« Reçu, à traiter », « En cours de pré-instruction », « En attente de pièces », « Transmis… ») et l'étape en cours.",
+      "À droite, les dossiers du lot : identifiant, libellé donné par la GED, date de réception, nombre de pages, taille du document.",
+      "Un badge indique le statut métier du dossier s'il est déjà dans votre bannette, ainsi que l'étape en cours.",
       "Le pli « Scénario de démonstration » décrit ce que le dossier est censé illustrer.",
     ],
     actions: [
       "Cliquez sur un lot pour afficher ses dossiers.",
-      "Cliquez sur « Importer et lancer l'OCR ». Le dossier reçoit un numéro d'enregistrement, le PDF est lu par l'OCR (quelques secondes), les pages sont typées et le certificat médical est mis sous pli. Vous arrivez au typage des pièces.",
-      "« Reprendre » rouvre un dossier déjà commencé à son étape courante. « Réimporter » repart de zéro pour ce dossier.",
+      "Cliquez sur « Prendre en charge et lire le dossier ». Le dossier reçoit un numéro d'enregistrement, le document est lu par l'OCR en quelques secondes et les pages sont typées. Vous arrivez directement à la première étape de traitement.",
+      "« Reprendre » rouvre un dossier déjà commencé à son étape courante. « Reprendre à zéro » relance la lecture depuis le début.",
     ],
     conseil: "Commencez par le dossier D-2026-0301 (Jean DUPONT) : il est complet, ce qui permet de voir tout le parcours sans obstacle, y compris le rattachement à un usager déjà connu.",
   },
   {
-    numero: 2,
+    numero: 1,
     titre: "Typage des pièces",
+    module: "Module 2 · Dossiers",
     chemin: "/dossiers/<id>/decoupage",
     objectif: "Vérifier que chaque page a été rattachée à la bonne pièce (formulaire, certificat médical, pièce d'identité, RIB, avis d'imposition…).",
     ecran: [
-      "À gauche, le document numérisé, page par page. Les pages du certificat médical portent un cadenas : leur image n'est pas affichée (pli cacheté).",
+      "À gauche, le document numérisé, page par page.",
       "À droite, la structure détectée : chaque pièce avec ses pages, son type, un score de confiance et une mention « auto » ou « agent ».",
       "Les pages de la notice du CERFA, les mentions RGPD et les pages vides ou illisibles sont marquées « à écarter » : elles n'entrent pas dans l'instruction.",
       "« Détail des pages » montre, pour chaque page, la raison de sa classification et un aperçu de son texte.",
@@ -106,29 +112,31 @@ const ETAPES: Etape[] = [
     conseil: "Le pied de page « cerfa 16301*01 » donne à l'outil le numéro officiel de chaque page du formulaire : c'est ce qui rend le typage fiable, même quand les pièces arrivent dans le désordre, et ce qui permet de vérifier que le formulaire est complet.",
   },
   {
-    numero: 3,
+    numero: 2,
     titre: "Contrôle des données",
+    module: "Module 2 · Dossiers",
     chemin: "/dossiers/<id>/extraction",
     objectif: "Relire les champs extraits de chaque pièce en regard du document, vérifier les champs critiques, compléter ce qui n'a pas été lu, puis rapprocher l'identité des usagers connus.",
     ecran: [
-      "À gauche, le document ; à droite, un onglet par pièce et le tableau des champs : libellé, valeur (modifiable), score de confiance, case « vérifié », extrait du texte OCR d'où vient la valeur. Cliquer sur une ligne affiche la page du document où se trouve le champ.",
-      "Les champs critiques portent une étoile : identité, date de naissance, NIR, questionnaire d'autonomie, mesure de protection, signature, validité de la CNI, IBAN… Ils doivent être cochés « vérifié » ou corrigés.",
+      "À gauche, le document ; à droite, un onglet par pièce et le tableau des champs : libellé, valeur (modifiable), score de confiance, case « vérifié », extrait du texte d'où vient la valeur. Cliquer sur une ligne affiche la page du document où se trouve le champ.",
+      "Les champs critiques portent une étoile : identité, date de naissance, numéro de sécurité sociale, questionnaire d'autonomie, mesure de protection, signature, validité de la pièce d'identité, IBAN, patient et date du certificat médical. Ils doivent être cochés « vérifié » ou corrigés.",
       "Les lignes non lues ou douteuses sont surlignées en ambre ; les lignes modifiées passent en bleu avec la mention « corrigé ».",
-      "Pour le certificat médical, seuls l'identité du patient, la date, le lieu et le médecin apparaissent : le contenu médical reste sous pli.",
-      "Sous le tableau, la carte « Rapprochement avec les usagers connus » présente les usagers de Solis correspondant à l'identité lue, du plus sûr (NIR identique) au moins sûr (homonyme), avec leurs demandes antérieures.",
+      "Pour le certificat médical, tout le volet est extrait : identité du patient, pathologies, prises en charge, mobilité et grille d'évaluation de l'autonomie.",
+      "Sous le tableau, la carte « Rapprochement avec les usagers connus » présente les usagers du logiciel métier correspondant à l'identité lue, du plus sûr (numéro de sécurité sociale identique) au moins sûr (homonyme), avec leurs demandes antérieures.",
     ],
     actions: [
       "Tapez directement dans une case pour corriger une valeur ; pour les champs à cases cochées, utilisez la liste déroulante.",
       "Cochez « vérifié » sur chaque champ critique après l'avoir comparé au document, ou utilisez « Marquer les critiques vérifiés » pour une pièce sûre.",
       "Dans le rapprochement, cliquez « C'est cet usager » pour rattacher la demande à un usager existant, ou « Nouvel usager » si aucun candidat ne correspond. Jamais de rattachement automatique.",
-      "« Voir le texte OCR » affiche le Markdown brut de la pièce. « Relancer l'extraction » refait l'appel pour la pièce affichée, les corrections sont conservées.",
+      "« Voir le texte OCR » affiche le texte brut de la pièce. « Relancer l'extraction » refait l'appel pour la pièce affichée, les corrections sont conservées.",
       "« Valider et passer à la recevabilité » n'est actif que lorsque toutes les pièces sont extraites, tous les champs critiques vérifiés et le rapprochement confirmé.",
     ],
     conseil: "Si un candidat affiche « demande déjà en cours », le rattacher évite de créer un doublon : l'envoi viendra compléter la demande existante.",
   },
   {
-    numero: 4,
+    numero: 3,
     titre: "Complétude et recevabilité",
+    module: "Module 2 · Dossiers",
     chemin: "/dossiers/<id>/conformite",
     objectif: "Savoir si le dossier peut partir en instruction ou s'il faut réclamer des pièces, fixer la date de dossier complet et préparer le courrier à l'usager.",
     ecran: [
@@ -144,34 +152,37 @@ const ETAPES: Etape[] = [
     ],
   },
   {
-    numero: 5,
+    numero: 4,
     titre: "Pré-instruction et orientation",
+    module: "Module 2 · Dossiers",
     chemin: "/dossiers/<id>/decision",
-    objectif: "Obtenir une orientation motivée par les règles administratives, puis retenir celle qui sera appliquée. L'agent d'accueil ne décide pas de l'attribution de l'APA : il oriente.",
+    objectif: "Obtenir une orientation motivée par les règles administratives, puis retenir celle qui sera appliquée. L'agent d'accueil ne décide pas de l'attribution de l'aide : il oriente.",
     ecran: [
       "Un bandeau annonce l'orientation proposée et sa motivation.",
-      "La liste des règles appliquées : condition d'âge, organisme compétent d'après le questionnaire, lieu de résidence, département financeur, non-cumul, certificat médical transmis sous pli.",
+      "La liste des règles appliquées : condition d'âge, organisme compétent d'après le questionnaire, lieu de résidence, département financeur, non-cumul, perte d'autonomie.",
+      "Quand la grille du certificat médical a été lue, une carte donne un GIR estimé, à titre indicatif : l'évaluation à domicile par l'équipe médico-sociale fait foi.",
       "La carte « Orientation retenue » propose les orientations possibles (celle du système est signalée « proposée »), affiche le destinataire, le statut que prendra le dossier et le courrier associé, et un champ de commentaire.",
     ],
     actions: [
       "Choisissez l'orientation. Vous pouvez suivre la proposition ou vous en écarter : c'est votre décision, elle est journalisée.",
       "Ajoutez un commentaire pour l'instruction (motivation, points à signaler).",
-      "« Valider l'orientation et préparer la transmission » enregistre le tout, génère le courrier correspondant s'il manque et ouvre l'enregistrement.",
+      "« Valider l'orientation et préparer la transmission » enregistre le tout, génère le courrier correspondant s'il manque et ouvre l'étape d'enregistrement.",
     ],
   },
   {
-    numero: 6,
+    numero: 5,
     titre: "Enregistrement et transmission",
+    module: "Module 2 · Dossiers, vers le module 3 · Solis",
     chemin: "/dossiers/<id>/export",
     objectif: "Enregistrer la demande dans le logiciel métier avec son statut, la rattacher à l'usager confirmé ou créer l'usager, la transmettre au destinataire, et déposer les pièces typées dans la GED.",
     ecran: [
       "La carte « Usager » rappelle le rapprochement confirmé : usager connu (avec sa demande en cours le cas échéant) ou nouvel usager.",
-      "La carte « Demande » résume ce qui part vers Solis : numéro d'enregistrement, dates, recevabilité, orientation, statut, destinataire ; le JSON complet est consultable.",
-      "La carte « Courriers » liste les courriers générés. La carte « Retour vers la GED » liste les pièces qui seront déposées sous l'usager, chacune ouvrable en PDF ; le certificat médical est marqué confidentiel.",
+      "La carte « Demande » résume ce qui part vers le logiciel métier : numéro d'enregistrement, dates, recevabilité, orientation, statut, destinataire ; le détail complet est consultable.",
+      "La carte « Courriers » liste les courriers générés. La carte « Retour vers la GED » liste les pièces qui seront déposées sous l'usager, chacune ouvrable en PDF.",
     ],
     actions: [
       "Cliquez sur « Enregistrer dans Solis et transmettre ». Le retour affiche le numéro d'usager, le numéro de demande (créée, rattachée ou mise à jour) et le statut.",
-      "Le dossier prend son statut final. « Retour à la GED » permet d'en prendre un autre.",
+      "Le dossier prend son statut final et apparaît dans le module Solis, sous la fiche de l'usager.",
     ],
   },
 ];
@@ -188,10 +199,10 @@ const CONTROLES_COHERENCE = [
   "Formulaire signé et daté ; qualité du signataire cohérente avec la mesure de protection déclarée.",
   "Nom, prénom et date de naissance de la pièce d'identité comparés au formulaire.",
   "Validité de la pièce d'identité à la date de réception, avec la prolongation légale de 5 ans des cartes délivrées entre 2004 et 2013.",
-  "Titulaire du RIB contenant le nom du demandeur ; clé de l'IBAN vérifiée.",
+  "Titulaire du relevé bancaire contenant le nom du demandeur ; clé de l'IBAN vérifiée.",
   "Année de l'avis d'imposition ; nom du demandeur parmi les déclarants ; avis commun attendu quand le demandeur est en couple.",
   "Certificat médical établi pour le demandeur, daté de moins de 3 mois, médecin identifié ; certificat vierge considéré comme absent.",
-  "Rapprochement Solis : identité concordante avec l'usager rattaché, adresse à mettre à jour signalée, demande déjà en cours signalée.",
+  "Rapprochement : identité concordante avec l'usager rattaché, adresse à mettre à jour signalée, demande déjà en cours signalée.",
   "Clé du numéro de sécurité sociale ; présence des réponses au questionnaire d'autonomie.",
 ];
 
@@ -215,7 +226,7 @@ export default function ModeDEmploi() {
             ))}
           </ul>
           <Link href="/ged" className="mt-4 block rounded-md bg-blue-600 px-3 py-2 text-center text-sm font-semibold text-white transition hover:bg-blue-700">
-            Entrer dans la plateforme
+            Entrer dans l&apos;outil
           </Link>
         </nav>
       </aside>
@@ -223,46 +234,78 @@ export default function ModeDEmploi() {
       <div className="flex flex-col gap-12">
         <header className="flex flex-col gap-3">
           <p className="text-xs font-semibold uppercase tracking-wider text-blue-600">Mode d&apos;emploi</p>
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">Prendre en main InstructOCR</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">Prendre en main {MARQUE.nom}</h1>
           <p className="max-w-3xl text-lg text-slate-600">
-            Ce guide s&apos;adresse à un agent qui découvre la plateforme. Il décrit ce qu&apos;elle fait, comment se déroule la pré-instruction
+            Ce guide s&apos;adresse à un agent qui découvre l&apos;outil. Il décrit ce qu&apos;il fait, comment se déroule la pré-instruction
             d&apos;un dossier, comment lire chaque indicateur et quelles règles sont appliquées. Comptez dix minutes de lecture.
           </p>
         </header>
 
-        <Section id="presentation" titre="1. À quoi sert la plateforme">
+        <Section id="presentation" titre="1. À quoi sert l'outil">
           <p className="text-slate-700">
-            InstructOCR prépare l&apos;instruction des demandes d&apos;aide à l&apos;autonomie à domicile déposées avec le formulaire CERFA
-            16301*01 (Allocation Personnalisée d&apos;Autonomie, dite APA). Un dossier arrive numérisé depuis la GED : le formulaire, la pièce
-            d&apos;identité, le RIB, l&apos;avis d&apos;imposition, parfois un certificat médical, le tout dans un seul PDF et pas toujours dans l&apos;ordre.
+            {MARQUE.nom} est l&apos;outil de traitement intelligent des dossiers des solidarités de la {MARQUE.collectivite}. Cette version prépare
+            l&apos;instruction des demandes d&apos;aide à l&apos;autonomie à domicile déposées avec le formulaire CERFA 16301*01 (Allocation
+            Personnalisée d&apos;Autonomie, dite APA). Un dossier arrive numérisé depuis la gestion électronique des documents : le formulaire, la
+            pièce d&apos;identité, le relevé bancaire, l&apos;avis d&apos;imposition, parfois un certificat médical, le tout dans un seul document et
+            pas toujours dans l&apos;ordre.
           </p>
           <p className="text-slate-700">
-            La plateforme enregistre la réception, lit le PDF, reconnaît chaque page, en extrait les informations utiles, rapproche l&apos;usager
-            des usagers connus, vérifie que le dossier est complet et cohérent, applique les règles administratives et propose une
-            orientation. À chaque étape, l&apos;agent voit ce que l&apos;outil a compris, corrige et valide ; chaque action est journalisée. Rien
-            n&apos;est transmis au logiciel métier sans son accord.
+            L&apos;outil enregistre la réception, lit le document, reconnaît chaque page, en extrait les informations utiles, rapproche l&apos;usager
+            des usagers connus, vérifie que le dossier est complet et cohérent, applique les règles administratives et propose une orientation. À
+            chaque étape, l&apos;agent voit ce que l&apos;outil a compris, corrige et valide ; chaque action est journalisée. Rien n&apos;est transmis
+            au logiciel métier sans son accord.
           </p>
-          <Encart titre="Ce que la plateforme ne fait pas">
-            Elle ne décide pas de l&apos;attribution de l&apos;APA, n&apos;évalue pas la perte d&apos;autonomie (cela reste l&apos;évaluation à domicile
-            par l&apos;équipe médico-sociale), ne lit jamais le contenu médical du certificat (remis sous pli cacheté) et ne remplace pas le
-            logiciel métier. Dans cette version de démonstration, la GED et le logiciel Solis sont simulés et tous les usagers sont fictifs.
+          <Encart titre="Ce que l'outil ne fait pas">
+            Il ne décide pas de l&apos;attribution de l&apos;aide et n&apos;évalue pas la perte d&apos;autonomie : l&apos;évaluation à domicile par
+            l&apos;équipe médico-sociale fait foi, le GIR affiché n&apos;est qu&apos;une estimation indicative. Il ne remplace pas le logiciel métier.
+            Dans cette version de démonstration, la gestion documentaire et le logiciel métier sont simulés et tous les usagers sont fictifs.
           </Encart>
         </Section>
 
-        <Section id="caracteristiques" titre="2. Caractéristiques">
+        <Section id="modules" titre="2. Les trois modules">
+          <p className="text-slate-700">
+            L&apos;outil suit le chemin réel d&apos;un dossier, et chaque étape de ce chemin a son propre espace, accessible depuis la barre du haut.
+            Le traitement n&apos;est pas caché derrière l&apos;écran d&apos;arrivée des documents.
+          </p>
+          <ol className="grid gap-4 md:grid-cols-3">
+            {MODULES.map((m) => (
+              <li key={m.id} className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-lg ring-1 ring-blue-100" aria-hidden>
+                    {m.icone}
+                  </span>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-blue-600">Module {m.numero}</p>
+                    <p className="font-semibold text-slate-900">{m.libelle}</p>
+                  </div>
+                </div>
+                <p className="text-sm font-medium text-slate-700">{m.sousTitre}</p>
+                <p className="text-sm text-slate-600">{m.description}</p>
+                <Link href={m.chemin} className="mt-1 text-sm font-semibold text-blue-700 hover:underline">
+                  Ouvrir →
+                </Link>
+              </li>
+            ))}
+          </ol>
+          <Encart teinte="vert" titre="Ne pas confondre Solid'IA et Solis">
+            {MARQUE.nom} est l&apos;outil que vous utilisez. Solis est le logiciel métier de l&apos;action sociale, où les usagers et leurs demandes
+            sont enregistrés : c&apos;est la destination du dossier, simulée ici par le module 3.
+          </Encart>
+        </Section>
+
+        <Section id="caracteristiques" titre="3. Caractéristiques">
           <ul className="grid gap-3 sm:grid-cols-2">
             {[
-              ["Enregistrement à la réception", "Chaque dossier importé reçoit un numéro d'enregistrement et un statut métier qui évolue : reçu, en cours, en attente de pièces, transmis, orienté."],
-              ["Lecture OCR", "Chaque page du PDF est convertie en texte structuré par Mistral OCR, y compris les tableaux et les cases cochées. Une dizaine de pages prend quelques secondes."],
+              ["Enregistrement à la réception", "Chaque dossier pris en charge reçoit un numéro d'enregistrement et un statut métier qui évolue : reçu, en cours, en attente de pièces, transmis, orienté."],
+              ["Lecture automatique", "Chaque page est convertie en texte structuré par un moteur de reconnaissance de documents, tableaux et cases cochées compris. Une dizaine de pages prend quelques secondes."],
               ["Typage par règles", "Le numéro officiel de chaque page du CERFA est lu dans son pied de page ; les autres pièces sont reconnues à leurs intitulés ; les pages vides sont écartées. Les règles sont déterministes et expliquées."],
-              ["Secret médical", "Le certificat médical est mis sous pli dès le typage : son image n'est pas affichée, son contenu médical n'est ni conservé ni extrait. Seuls l'identité du patient, la date et le médecin sont contrôlés."],
               ["Extraction structurée et vidéocodage", "Pour chaque type de pièce, un schéma de champs est extrait du texte, avec pour chaque champ une valeur, un score de confiance et l'extrait d'origine. Les champs s'affichent en regard du document ; les champs critiques exigent une vérification explicite."],
-              ["Vérifications déterministes", "Les identifiants à clé de contrôle (NIR, IBAN) sont relus dans le texte et vérifiés ; une case cochée invisible à l'OCR est déduite quand les cases voisines sont visibles vides ; une case inventée par le modèle est démasquée."],
-              ["Rapprochement d'identité", "L'identité lue est confrontée aux usagers connus de Solis, par NIR puis par état civil, homonymes compris. L'agent confirme ; une demande déjà en cours est signalée pour éviter les doublons."],
+              ["Vérifications déterministes", "Les identifiants à clé de contrôle (sécurité sociale, IBAN) sont relus dans le texte et vérifiés ; une case cochée invisible à la lecture est déduite quand les cases voisines sont visibles vides ; une case inventée par le modèle est démasquée."],
+              ["Rapprochement d'identité", "L'identité lue est confrontée aux usagers connus, par numéro de sécurité sociale puis par état civil, homonymes compris. L'agent confirme ; une demande déjà en cours est signalée pour éviter les doublons."],
               ["Complétude, délais et courriers", "Pièces obligatoires et conditionnelles, formulaire complet et signé, cohérence entre pièces ; date de dossier complet, délais d'accusé de réception et de décision ; courriers générés (accusé de réception, demande de pièces, transmission, orientation)."],
-              ["Pré-instruction", `Condition d'âge (${PARAMETRES.ageMinimumApa} ans), organisme compétent d'après le questionnaire, résidence, département financeur, non-cumul. L'agent retient l'orientation et le statut en découle.`],
-              ["Enregistrement, transmission, retour GED", "Création ou rattachement de l'usager, création ou mise à jour de la demande dans Solis avec son statut, transmission au destinataire, dépôt des pièces typées dans la GED sous l'usager, avec le certificat en accès restreint."],
-              ["Journal des actions", "Import, typage, corrections avec valeur avant et après, vérifications, rapprochement, recevabilité, courriers, orientation, enregistrement : tout est horodaté et consultable depuis le bandeau du dossier."],
+              ["Pré-instruction", `Condition d'âge (${PARAMETRES.ageMinimumApa} ans), organisme compétent d'après le questionnaire, résidence, département financeur, non-cumul, GIR estimé à titre indicatif. L'agent retient l'orientation et le statut en découle.`],
+              ["Enregistrement, transmission, retour GED", "Création ou rattachement de l'usager, création ou mise à jour de la demande avec son statut, transmission au destinataire, dépôt des pièces typées dans la GED sous l'usager."],
+              ["Journal des actions", "Prise en charge, typage, corrections avec valeur avant et après, vérifications, rapprochement, recevabilité, courriers, orientation, enregistrement : tout est horodaté et consultable depuis le bandeau du dossier."],
             ].map(([titre, texte]) => (
               <li key={titre} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <p className="font-semibold text-slate-900">{titre}</p>
@@ -298,17 +341,23 @@ export default function ModeDEmploi() {
           </div>
         </Section>
 
-        <Section id="parcours" titre="3. Le parcours pas à pas">
+        <Section id="parcours" titre="4. Le parcours pas à pas">
           <p className="text-slate-700">
-            Un dossier suit toujours les mêmes six étapes. Le fil des étapes en haut de chaque page de dossier montre où vous en êtes ;
-            les étapes déjà passées restent accessibles pour revenir en arrière. Le journal des actions se déplie sous le fil.
+            Un dossier est pris en charge dans le module GED, puis suit cinq étapes dans le module Dossiers avant d&apos;être enregistré dans le
+            logiciel métier. Le fil des étapes en haut de chaque dossier montre où vous en êtes ; les étapes déjà passées restent accessibles. Le
+            journal des actions se déplie sous le fil.
           </p>
           <ol className="flex flex-col gap-6">
-            {ETAPES.map((e) => (
+            {ETAPES_GUIDE.map((e) => (
               <li key={e.numero} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex flex-wrap items-center gap-3">
-                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">{e.numero}</span>
+                  <span
+                    className={`inline-flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold text-white ${e.numero === 0 ? "bg-slate-500" : "bg-blue-600"}`}
+                  >
+                    {e.numero === 0 ? "0" : e.numero}
+                  </span>
                   <h3 className="text-lg font-semibold text-slate-900">{e.titre}</h3>
+                  <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">{e.module}</span>
                   <code className="ml-auto rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{e.chemin}</code>
                 </div>
                 <p className="mt-3 text-sm text-slate-700">
@@ -344,7 +393,7 @@ export default function ModeDEmploi() {
           </ol>
         </Section>
 
-        <Section id="indicateurs" titre="4. Lire les indicateurs">
+        <Section id="indicateurs" titre="5. Lire les indicateurs">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <p className="font-semibold text-slate-900">Scores de confiance et vérification</p>
@@ -413,7 +462,10 @@ export default function ModeDEmploi() {
                 </div>
                 <div>
                   <dt className="font-medium text-slate-900">{LIBELLES_ORIENTATION.caisse_retraite}</dt>
-                  <dd className="text-slate-600">Moins de {PARAMETRES.seuilNonQuestionnaire} réponses « non » au questionnaire : la demande relève de la caisse de retraite. Courrier d&apos;information à l&apos;usager.</dd>
+                  <dd className="text-slate-600">
+                    Moins de {PARAMETRES.seuilNonQuestionnaire} réponses « non » au questionnaire : la demande relève de la caisse de retraite. Courrier
+                    d&apos;information à l&apos;usager.
+                  </dd>
                 </div>
                 <div>
                   <dt className="font-medium text-slate-900">{LIBELLES_ORIENTATION.mdph}</dt>
@@ -438,7 +490,7 @@ export default function ModeDEmploi() {
                     <dd className="text-slate-600">
                       {
                         {
-                          recu: "Importé et enregistré, typage non validé.",
+                          recu: "Pris en charge et enregistré, typage non validé.",
                           en_cours: "Pré-instruction en cours, ou dossier complet en attente d'orientation.",
                           en_attente_pieces: "Non recevable : demande de pièces envoyée, le délai d'instruction ne court pas.",
                           transmis_ems: "Transmis à l'équipe médico-sociale pour évaluation à domicile.",
@@ -455,11 +507,10 @@ export default function ModeDEmploi() {
           </div>
         </Section>
 
-        <Section id="regles" titre="5. Les règles appliquées">
+        <Section id="regles" titre="6. Les règles appliquées">
           <Encart teinte="ambre" titre="Un premier jeu de règles">
-            Les règles ci-dessous sont issues du CERFA 16301*01, de sa notice et des pratiques usuelles de gestion de dossiers. Elles
-            constituent une base de travail à affiner avec les services instructeurs ; les seuils et délais sont regroupés dans un fichier de
-            paramètres.
+            Les règles ci-dessous sont issues du CERFA 16301*01, de sa notice et des pratiques usuelles de gestion de dossiers. Elles constituent une
+            base de travail à affiner avec les services instructeurs ; les seuils et délais sont regroupés dans un fichier de paramètres.
           </Encart>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -473,7 +524,7 @@ export default function ModeDEmploi() {
               <ul className="mt-2 list-disc pl-5 text-sm text-slate-600">
                 <li>Décision de justice si une mesure de protection est déclarée prononcée ou si le formulaire est signé par un représentant légal (bloquant).</li>
                 <li>Avis de taxe foncière si la résidence principale est déclarée non louée ou si d&apos;autres biens immobiliers sont déclarés (alerte).</li>
-                <li>Certificat médical : facultatif, transmis sous pli. S&apos;il est joint mais vierge, il est considéré comme absent.</li>
+                <li>Certificat médical : facultatif. S&apos;il est joint mais vierge, il est considéré comme absent.</li>
               </ul>
               <p className="mt-3 font-semibold text-slate-900">Délais</p>
               <ul className="mt-2 list-disc pl-5 text-sm text-slate-600">
@@ -510,13 +561,13 @@ export default function ModeDEmploi() {
                 <span className="font-medium text-slate-800">Non-cumul :</span> ACTP, aide sociale départementale à domicile, MTP, PCH et PCRTP ne se cumulent pas avec l&apos;APA. Leur perception est signalée.
               </li>
               <li>
-                <span className="font-medium text-slate-800">Perte d&apos;autonomie :</span> jamais évaluée par la plateforme. Le certificat médical est transmis sous pli à l&apos;équipe médico-sociale, qui évalue à domicile.
+                <span className="font-medium text-slate-800">Perte d&apos;autonomie :</span> un GIR est estimé à partir de la grille du certificat médical (14 items), à titre indicatif. Les GIR 5 et 6 n&apos;ouvrent pas droit à l&apos;APA. L&apos;évaluation AGGIR à domicile fait foi.
               </li>
             </ul>
           </div>
         </Section>
 
-        <Section id="demonstration" titre="6. Les dossiers de démonstration">
+        <Section id="demonstration" titre="7. Les dossiers de démonstration">
           <p className="text-slate-700">
             Six dossiers fictifs, répartis dans {LOTS_GED.filter((l) => DOSSIERS_FICTIFS.some((d) => d.lotId === l.id)).length} lots, ont été
             fabriqués à partir du CERFA officiel puis numérisés. Chacun illustre une situation que la pré-instruction rencontre. Aucune de ces
@@ -565,15 +616,15 @@ export default function ModeDEmploi() {
           </div>
         </Section>
 
-        <Section id="limites" titre="7. Limites à connaître">
+        <Section id="limites" titre="8. Limites à connaître">
           <ul className="flex flex-col gap-3">
             {[
-              ["L'OCR n'est pas parfait, ni toujours identique", "Certaines cases cochées ne sont pas vues, et la lecture d'un même document peut varier d'un jour à l'autre. Quand aucune case n'est visible, la plateforme déclare le champ « non lu » plutôt que de deviner : c'est à l'agent de compléter, document à l'appui."],
+              ["La lecture automatique n'est pas parfaite, ni toujours identique", "Certaines cases cochées ne sont pas vues, et la lecture d'un même document peut varier d'un jour à l'autre. Quand aucune case n'est visible, l'outil déclare le champ « non lu » plutôt que de deviner : c'est à l'agent de compléter, document à l'appui."],
               ["Les dossiers restent dans votre navigateur", "L'état des dossiers en cours, leur journal et leurs courriers sont conservés sur ce poste, dans ce navigateur. Un autre poste ne les voit pas, et vider les données du navigateur les efface. Une base partagée est prévue pour la suite."],
-              ["GED et Solis sont simulés", "Les lots, les dossiers, la recherche d'usager, l'enregistrement et le dépôt des pièces sont des simulations réalistes mais locales. Les numéros renvoyés ne sont pas réels."],
+              ["GED et logiciel métier sont simulés", "Les lots, les dossiers, la recherche d'usager, l'enregistrement et le dépôt des pièces sont des simulations réalistes mais locales. Les numéros renvoyés ne sont pas réels."],
               ["Les règles sont un premier jeu", "Elles reflètent le CERFA, sa notice et les pratiques usuelles, pas encore celles des services instructeurs. Les seuils et délais sont modifiables."],
-              ["Des appels réseau à chaque étape", "OCR et extraction passent par l'API Mistral. Une coupure d'accès à internet fait échouer l'import ou l'extraction : il suffit de relancer une fois la connexion revenue."],
-              ["Pas d'authentification ni de rôles", "Le prototype n'a pas de comptes. Le cloisonnement du secret médical est appliqué à tous ; un rôle « équipe médico-sociale » ayant accès au certificat reste à construire. Ne pas exposer avec des données réelles."],
+              ["Des appels réseau à chaque étape", "La lecture et l'extraction passent par un service en ligne. Une coupure d'accès à internet fait échouer la prise en charge ou l'extraction : il suffit de relancer une fois la connexion revenue."],
+              ["Pas d'authentification ni de rôles", "Le prototype n'a pas de comptes ni de droits différenciés. Il ne doit pas être exposé avec des données réelles."],
             ].map(([titre, texte]) => (
               <li key={titre} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <p className="font-semibold text-slate-900">{titre}</p>
@@ -583,19 +634,20 @@ export default function ModeDEmploi() {
           </ul>
         </Section>
 
-        <Section id="faq" titre="8. Questions fréquentes">
+        <Section id="faq" titre="9. Questions fréquentes">
           <dl className="flex flex-col gap-4">
             {[
-              ["Comment recommencer un dossier depuis le début ?", "Sur la page d'import, cliquez sur « Réimporter et relancer l'OCR » : le dossier repart de zéro avec un nouveau numéro d'enregistrement. Sur l'accueil, « Retirer du poste » supprime un dossier de la bannette sans le retraiter."],
+              ["Où commencer ?", "Module 1, la GED : c'est là qu'arrivent les dossiers. Une fois un dossier pris en charge, il vit dans le module 2, Dossiers, où se trouve votre bannette et les cinq étapes. Le module 3, Solis, montre où aboutissent les demandes."],
+              ["Comment recommencer un dossier depuis le début ?", "Dans la GED, « Reprendre à zéro » relance la lecture et repart de l'étape 1 avec un nouveau numéro d'enregistrement. Dans la bannette, « Retirer du poste » enlève un dossier sans le retraiter."],
               ["Puis-je revenir à une étape précédente ?", "Oui. Le fil des étapes en haut du dossier permet de rouvrir toute étape déjà passée. Les corrections faites au contrôle des données recalculent automatiquement la recevabilité et les règles, même si vous sautez directement à la pré-instruction."],
               ["Pourquoi le bouton de validation du contrôle des données est-il grisé ?", "Il faut que toutes les pièces soient extraites, que chaque champ critique (★) soit coché « vérifié » ou corrigé, et que le rapprochement usager soit confirmé. Le texte sous le bouton indique ce qui manque."],
-              ["Le rapprochement propose plusieurs usagers, lequel choisir ?", "Le candidat « NIR identique » est le plus sûr. « Nom et date de naissance identiques » demande de vérifier l'adresse et les demandes antérieures. Un « homonyme » n'est presque jamais la bonne personne. En cas de doute, « Nouvel usager » et signalez-le dans le commentaire."],
-              ["Une extraction s'est terminée en erreur, que faire ?", "Ouvrez l'onglet de la pièce concernée et cliquez sur « Relancer l'extraction ». Si l'import lui-même a échoué, le dossier a été retiré de la bannette : réimportez-le."],
-              ["Combien de temps prend un dossier ?", "L'OCR prend quelques secondes, l'extraction du formulaire une dizaine de secondes, les autres pièces deux à trois secondes chacune. Le reste dépend de l'agent : compter trois à six minutes pour un dossier de démonstration, vérification des champs critiques comprise."],
+              ["Le rapprochement propose plusieurs usagers, lequel choisir ?", "Le candidat « numéro de sécurité sociale identique » est le plus sûr. « Nom et date de naissance identiques » demande de vérifier l'adresse et les demandes antérieures. Un « homonyme » n'est presque jamais la bonne personne. En cas de doute, « Nouvel usager » et signalez-le dans le commentaire."],
+              ["Une extraction s'est terminée en erreur, que faire ?", "Ouvrez l'onglet de la pièce concernée et cliquez sur « Relancer l'extraction ». Si la prise en charge elle-même a échoué, le dossier a été retiré de la bannette : reprenez-le depuis la GED."],
+              ["Combien de temps prend un dossier ?", "La lecture prend quelques secondes, l'extraction du formulaire une dizaine de secondes, les autres pièces deux à trois secondes chacune. Le reste dépend de l'agent : compter trois à six minutes pour un dossier de démonstration, vérification des champs critiques comprise."],
               ["Que devient une valeur que j'ai corrigée ?", "Elle prime sur la valeur lue pour toute la suite et reste marquée « corrigé » ; la valeur d'origine et la nouvelle sont consignées dans le journal. Vider la case revient à déclarer le champ non renseigné."],
               ["Pourquoi un dossier non recevable peut-il continuer ?", "Parce que la demande doit être enregistrée dès sa réception, avec le statut « en attente de pièces », et que la demande de pièces doit partir. Le délai d'instruction ne court qu'à partir du dossier complet."],
-              ["Où voir le contenu du certificat médical ?", "Nulle part dans la plateforme : il est sous pli cacheté et réservé à l'équipe médico-sociale, qui le recevra avec le dossier. Seuls l'identité du patient, la date et le médecin sont contrôlés."],
-              ["Où voir le texte lu par l'OCR ?", "Au contrôle des données, « Voir le texte OCR » affiche le texte de la pièce (le certificat médical apparaît expurgé). Le banc d'essai OCR, dans le menu, permet aussi de tester n'importe quel PDF ou image."],
+              ["Le GIR affiché est-il la décision ?", "Non. C'est une estimation indicative calculée sur la grille du certificat médical, pour situer le dossier. L'évaluation AGGIR à domicile par l'équipe médico-sociale est la seule qui fasse foi."],
+              ["Où voir le texte lu par la machine ?", "Au contrôle des données, « Voir le texte OCR » affiche le texte de la pièce affichée. Le banc d'essai, dans la barre du haut, permet aussi de tester n'importe quel PDF ou image."],
             ].map(([q, r]) => (
               <div key={q} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <dt className="font-semibold text-slate-900">{q}</dt>
@@ -605,18 +657,18 @@ export default function ModeDEmploi() {
           </dl>
         </Section>
 
-        <Section id="glossaire" titre="9. Glossaire">
+        <Section id="glossaire" titre="10. Glossaire">
           <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[auto_1fr]">
             {[
+              [MARQUE.nom, `L'outil que vous utilisez : ${MARQUE.accroche.toLowerCase()} de la ${MARQUE.collectivite}.`],
+              ["Solis", "Le logiciel métier de l'action sociale, où sont gérés les usagers et leurs demandes. Destination du dossier, simulée par le module 3."],
               ["APA", "Allocation Personnalisée d'Autonomie, versée par le département aux personnes de 60 ans et plus en perte d'autonomie."],
               ["CERFA 16301*01", "Formulaire national de demande d'aides à l'autonomie à domicile : accompagnement des caisses de retraite ou APA."],
               ["GED", "Gestion électronique des documents : l'outil où arrivent les dossiers numérisés et où les pièces typées sont redéposées."],
-              ["Solis", "Logiciel métier de l'action sociale, où sont gérés les usagers et leurs demandes."],
               ["Bannette", "File des dossiers d'un poste de travail, avec leur statut."],
               ["OCR", "Reconnaissance optique de caractères : conversion d'une image de document en texte."],
               ["Vidéocodage", "Vérification des données extraites en regard de l'image du document."],
               ["Identitovigilance", "Ensemble des précautions pour rattacher une demande à la bonne personne : recherche par identifiant puis par état civil, confirmation humaine, gestion des homonymes."],
-              ["Pli cacheté", "Enveloppe fermée dans laquelle le certificat médical est remis, réservée à l'équipe médico-sociale."],
               ["NIR", "Numéro d'inscription au répertoire, dit numéro de sécurité sociale, 15 chiffres dont 2 de clé."],
               ["Date de dossier complet", "Date à laquelle toutes les pièces sont réunies ; point de départ du délai de décision."],
               ["EMS", "Équipe médico-sociale du département, qui évalue à domicile et établit le plan d'aide."],
@@ -637,7 +689,7 @@ export default function ModeDEmploi() {
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-blue-100 bg-blue-50 px-5 py-4">
           <p className="text-sm text-blue-900">Vous avez tout lu ? Le plus simple est maintenant d&apos;essayer avec un dossier de démonstration.</p>
           <Link href="/ged" className="ml-auto rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700">
-            Entrer dans la plateforme
+            Entrer dans l&apos;outil
           </Link>
         </div>
       </div>

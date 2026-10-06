@@ -67,6 +67,14 @@ export function EnTeteDossier({ id }: { id: string }) {
 
   return (
     <div className="flex flex-col gap-4">
+      <nav aria-label="Fil d'Ariane" className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+        <Link href="/dossiers" className="font-medium text-blue-700 hover:underline">
+          Module 2 · Traitement des dossiers
+        </Link>
+        <span aria-hidden>›</span>
+        <span>{dossier.id}</span>
+      </nav>
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-blue-600">

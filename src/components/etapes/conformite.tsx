@@ -206,10 +206,7 @@ export function EtapeConformite({ id }: { id: string }) {
             <ul className="flex flex-col gap-1 text-sm">
               {(dossier.pieces ?? []).map((p) => (
                 <li key={p.id} className={`flex items-center justify-between gap-2 ${TYPES_A_ECARTER.includes(p.type) ? "text-slate-400 line-through" : ""}`}>
-                  <span>
-                    {LIBELLES_PIECES[p.type]}
-                    {p.type === "certificat_medical" ? <span className="ml-1 text-xs text-amber-700">pli cacheté</span> : null}
-                  </span>
+                  <span>{LIBELLES_PIECES[p.type]}</span>
                   <span className="text-xs text-slate-500">p. {p.pages.join(", ")}</span>
                 </li>
               ))}

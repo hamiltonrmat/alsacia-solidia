@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { EnTete } from "@/components/en-tete";
+import { MARQUE } from "@/lib/marque";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -14,20 +15,27 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "InstructOCR — Prototype APA",
-  description:
-    "Prototype d'instruction assistée des dossiers APA : OCR, découpage des pièces, extraction, contrôle de conformité et aide à la décision.",
+  title: {
+    default: `${MARQUE.nom} — ${MARQUE.accroche}`,
+    template: `%s`,
+  },
+  description: `${MARQUE.accroche} de la ${MARQUE.collectivite} : lecture automatique des dossiers numérisés, typage des pièces, contrôle des données, recevabilité, pré-instruction et enregistrement dans le logiciel métier.`,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html
-      lang="fr"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col bg-slate-50 dark:bg-black">
+    <html lang="fr" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+      <body className="flex min-h-full flex-col bg-slate-50">
         <EnTete />
         <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-8 sm:px-6">{children}</div>
+        <footer className="border-t border-slate-200 bg-white">
+          <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-4 text-xs text-slate-500 sm:px-6">
+            <p>
+              <span className="font-semibold text-slate-700">{MARQUE.nom}</span> · {MARQUE.accroche.toLowerCase()} de la {MARQUE.collectivite}
+            </p>
+            <p>{MARQUE.version} · données fictives, aucune donnée personnelle réelle</p>
+          </div>
+        </footer>
       </body>
     </html>
   );

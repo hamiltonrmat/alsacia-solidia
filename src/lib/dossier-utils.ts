@@ -2,7 +2,6 @@ import type { CandidatSolis } from "@/data/solis";
 import type { Piece, TypePiece } from "@/lib/decoupage";
 import { pageCerfaPourChemin } from "@/lib/extraction/schemas";
 import type { EntreeConformite, Lecteur } from "@/lib/regles/conformite";
-import { pagesSousPliCachete } from "@/lib/secret-medical";
 import { extractionParType, valeurEffective, type EtatDossier } from "@/store/dossier-store";
 
 /**
@@ -60,11 +59,6 @@ export function pagePourChamp(dossier: EtatDossier, piece: Piece, chemin: string
   return page ?? piece.pages[0];
 }
 
-/** Pages dont l'image ne doit pas être montrée à l'agent (certificat médical). */
-export function pagesMasquees(dossier: EtatDossier): number[] {
-  return pagesSousPliCachete(dossier.pagesClassees);
-}
-
 /** Candidat Solis retenu par l'agent, s'il a rattaché un usager existant. */
 export function usagerRattache(dossier: EtatDossier): CandidatSolis | null {
   const r = dossier.rapprochement;
@@ -90,7 +84,7 @@ export function metadonneesExport(dossier: EtatDossier): Record<string, unknown>
     source: {
       ged: { lot: dossier.lotId, dossier: dossier.id, pages: dossier.nbPages, dateReception: dossier.dateReception },
       numeroEnregistrement: dossier.numeroEnregistrement,
-      outil: "InstructOCR v2",
+      outil: "Solid'IA v2",
       importeLe: dossier.importeLe,
     },
     usager: {
@@ -136,7 +130,7 @@ export function metadonneesExport(dossier: EtatDossier): Record<string, unknown>
       },
       rib: { iban: lire("rib", "iban"), bic: lire("rib", "bic"), titulaire: lire("rib", "titulaire") },
       revenuFiscalReference: lire("avis_imposition", "revenu_fiscal_reference"),
-      certificatMedical: dossier.pieces?.some((p) => p.type === "certificat_medical") ? "joint, sous pli cacheté, transmis à l'EMS" : "non joint",
+      certificatMedical: dossier.pieces?.some((p) => p.type === "certificat_medical") ? "joint" : "non joint",
     },
     pieces: (dossier.pieces ?? []).map((p) => ({
       type: p.type,

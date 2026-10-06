@@ -442,7 +442,7 @@ function formaterEuros(montant: number): string {
 }
 
 function piedDePage(page: PDFPage, polices: Polices): void {
-  page.drawText("Document fictif généré pour la démonstration InstructOCR — ne correspond à aucune personne réelle.", {
+  page.drawText("Document fictif généré pour la démonstration Solid'IA — ne correspond à aucune personne réelle.", {
     x: 40,
     y: 28,
     size: 7,
@@ -666,7 +666,7 @@ async function rasteriser(octets: Uint8Array): Promise<Uint8Array> {
 
   const source = await pdfjs.getDocument({ data: octets, standardFontDataUrl, disableFontFace: true }).promise;
   const sortie = await PDFDocument.create();
-  sortie.setProducer("InstructOCR — dossier fictif numérisé");
+  sortie.setProducer("Solid'IA — dossier fictif numérisé");
   for (let n = 1; n <= source.numPages; n++) {
     const page = await source.getPage(n);
     const viewport = page.getViewport({ scale: DPI_SCAN / 72 });
@@ -702,7 +702,7 @@ async function genererDossier(modele: Uint8Array, dossier: DossierFictif): Promi
 
   const sortie = await PDFDocument.create();
   sortie.setTitle(`Dossier ${dossier.id}`);
-  sortie.setProducer("InstructOCR — générateur de dossiers fictifs");
+  sortie.setProducer("Solid'IA — générateur de dossiers fictifs");
   const polices: Polices = {
     normale: await sortie.embedFont(StandardFonts.Helvetica),
     grasse: await sortie.embedFont(StandardFonts.HelveticaBold),
