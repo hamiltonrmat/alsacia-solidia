@@ -1,8 +1,9 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { FormulaireConnexion } from "@/components/formulaire-connexion";
 import { MARQUE } from "@/lib/marque";
-import { protectionActive } from "@/lib/session";
+import { COOKIE_ACCES, jetonValide, protectionActive } from "@/lib/session";
 
 export const metadata = {
   title: "Connexion — Solid'IA",
@@ -26,6 +27,12 @@ function destination(valeur: string | string[] | undefined): string {
 export default async function PageConnexion({ searchParams }: PageProps<"/connexion">) {
   if (!protectionActive()) redirect("/");
   const { suite } = await searchParams;
+  const cible = destination(suite);
+
+  // Session déjà ouverte : inutile de redemander le mot de passe. Permet aussi
+  // d'entrer en rechargeant simplement la page si la navigation avait échoué.
+  const jeton = (await cookies()).get(COOKIE_ACCES)?.value;
+  if (jetonValide(jeton)) redirect(cible);
 
   return (
     <main className="flex flex-1 items-center justify-center py-6">
@@ -49,7 +56,7 @@ export default async function PageConnexion({ searchParams }: PageProps<"/connex
           </p>
 
           <div className="mt-6">
-            <FormulaireConnexion suite={destination(suite)} />
+            <FormulaireConnexion suite={cible} />
           </div>
 
           <p className="mt-6 border-t border-slate-100 pt-4 text-xs text-slate-500">
