@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { refuserSiNonAutorise } from "@/lib/garde-api";
 import { MistralOcrError, ocrDocument } from "@/lib/mistral-ocr";
 
 /**
@@ -8,6 +9,8 @@ import { MistralOcrError, ocrDocument } from "@/lib/mistral-ocr";
  */
 
 export const runtime = "nodejs";
+/** Les appels au service de lecture peuvent durer : 60 s de marge. */
+export const maxDuration = 60;
 
 const ACCEPTED_TYPES = new Set([
   "application/pdf",
@@ -21,6 +24,9 @@ const ACCEPTED_TYPES = new Set([
 const MAX_BYTES = 20 * 1024 * 1024;
 
 export async function POST(request: Request) {
+  const refus = refuserSiNonAutorise(request);
+  if (refus) return refus;
+
   let formData: FormData;
   try {
     formData = await request.formData();

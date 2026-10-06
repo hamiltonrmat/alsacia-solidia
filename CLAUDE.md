@@ -23,7 +23,7 @@ Toutes les données manipulées sont **synthétiques**. Le but est la démonstra
 | OCR | API Mistral `POST /v1/ocr`, `mistral-ocr-latest` | Serveur uniquement, `fetch` sans SDK, Markdown par page |
 | Extraction | API Mistral chat, sortie JSON contrainte (`response_format: json_schema`, strict) | `mistral-small-latest` par défaut, surcharge par requête (`modele`), post-traitement déterministe |
 | Génération PDF | pdf-lib (remplissage du CERFA, pièces dessinées, découpage physique) + pdfjs-dist et @napi-rs/canvas (rasterisation) | Dev dependencies, script `tsx` |
-| Hébergement cible | Vercel + GitHub | Pas encore de dépôt distant. `MISTRAL_API_KEY` ira dans les variables d'environnement Vercel. Supabase prévu pour remplacer le localStorage (bannette partagée, journal) |
+| Hébergement cible | Vercel + GitHub | Procédure dans `DEPLOIEMENT.md`. Trois variables : `MISTRAL_API_KEY`, `SOLIDIA_MOT_DE_PASSE`, `SOLIDIA_SECRET_SESSION`. Supabase prévu pour remplacer le localStorage |
 
 Commandes : `npm run dev`, `npm run build` (type-check inclus, y compris `scripts/`), `npm run lint` (ESLint 9, règles React 19 : pas de `setState` direct dans un effet, mémoïser les objets passés en dépendances), `npm run generer:dossiers`, `npx tsx scripts/tester-pipeline.ts <id> [url] [sortie.json]`.
 
@@ -53,6 +53,12 @@ src/components/vue-solis.tsx           Module 3 : référentiel et demandes enre
 src/components/bandeau-module.tsx      En-tête de page d'un module + liens vers les deux autres
 src/components/rapprochement-usager.tsx  Identitovigilance : candidats Solis, confirmation par l'agent
 src/components/{ui,en-tete,en-tete-dossier,visionneuse-pdf,ocr-bench}.tsx
+src/proxy.ts                           Porte d'entrée (ex-middleware, runtime Node en Next 16) : redirige vers /connexion sans jeton
+src/app/connexion/page.tsx             Page de connexion (force-dynamic : l'env est lu à l'exécution)
+src/app/api/connexion/route.ts         POST (vérifie le mot de passe, pose les cookies) / DELETE (déconnexion)
+src/lib/session.ts                     Jeton HMAC, options de cookies, protectionActive() (server-only)
+src/lib/garde-api.ts                   Seconde vérification du jeton dans les routes d'API
+src/lib/noms-cookies.ts                Noms de cookies partagés serveur/navigateur
 src/lib/marque.ts                      Nom, accroche, collectivité, version
 src/lib/modules.ts                     Les 3 modules (libellé, titre, chemin, description)
 src/lib/etapes.ts                      Les 5 étapes et leur résumé (utilisable côté serveur, contrairement au store)
@@ -62,7 +68,7 @@ src/lib/extraction/schemas.ts          Schémas JSON par type (certificat : vole
 src/lib/extraction/mistral-extraction.ts  Prompt, appel chat, post-traitement (cases, IBAN, NIR) (server-only)
 src/lib/regles/parametres.ts           Seuils et délais métier (PARAMETRES)
 src/lib/regles/conformite.ts           Complétude, cohérences, rapprochement, recevabilité
-src/lib/regles/decision.ts             Pré-instruction : règles, GIR estimé, orientation, statut et destinataire
+src/lib/regles/decision.ts             Pré-instruction : règles, orientation, statut et destinataire (aucun calcul de GIR)
 src/lib/courriers.ts                   Accusé de réception, demande de pièces, transmission caisse, orientation MDPH, dates limites
 src/lib/statuts.ts                     Statuts métier du dossier et libellés
 src/lib/{dates,identifiants,dossier-utils}.ts
@@ -128,7 +134,7 @@ Les cinq étapes d'un dossier :
 1. **Typage des pièces** (`decoupage.ts`) : pied de page CERFA, mots-clés, pages vides écartées.
 2. **Contrôle des données** (`extraction/`) : vidéocodage (document en regard, saut à la page du champ), champs critiques ★ à confirmer (`CHAMPS_CRITIQUES`), corrections journalisées avec avant/après, **rapprochement usager** (candidats Solis par NIR, état civil, homonymes ; confirmation par l'agent ; demande en cours signalée). Validation bloquée tant que tout n'est pas vérifié et rapproché.
 3. **Complétude et recevabilité** (`regles/conformite.ts`) : pièces obligatoires et conditionnelles, formulaire complet (pages 5 à 9) sans doublon, un seul demandeur, signé et daté, cohérences CNI/RIB/avis/certificat, rapprochement. Statuts `ok | info | alerte | bloquant`. Délais (AR, complétude, décision) et courrier. À la validation : `dateCompletude` si recevable, statut `en_cours` ou `en_attente_pieces`.
-4. **Pré-instruction** (`regles/decision.ts`) : recevabilité recalculée sur place, règles (âge, questionnaire, résidence, domicile de secours, non-cumul, **GIR estimé** par `estimerGir` sur les 14 items de la grille du certificat), orientation `instruction_apa | caisse_retraite | mdph | pieces_manquantes | indeterminee`, statut dérivé, courrier généré s'il manque.
+4. **Pré-instruction** (`regles/decision.ts`) : recevabilité recalculée sur place, règles (âge, questionnaire, résidence, domicile de secours, non-cumul, constat des éléments médicaux versés au dossier sans notation), orientation `instruction_apa | caisse_retraite | mdph | pieces_manquantes | indeterminee`, statut dérivé, courrier généré s'il manque.
 5. **Enregistrement et transmission** (`api/solis` enregistrer) : usager créé ou rattaché, demande créée, rattachée ou mise à jour, statut transmis, courriers, retour GED (une route sert le PDF de chaque pièce).
 
 Journal (`journal` dans le store) : prise en charge, OCR, typage, corrections, vérifications, rapprochement, recevabilité, courriers, orientation, enregistrement, navigation.
@@ -136,8 +142,9 @@ Journal (`journal` dans le store) : prise en charge, OCR, typage, corrections, v
 ## 8. Règles de travail
 
 - **Langue** : UI, documentation, commentaires et commits en français. Vocabulaire métier : module, typage, contrôle des données, complétude, pré-instruction, enregistrement, bannette.
+- **Protection de la démo** : mot de passe unique via `SOLIDIA_MOT_DE_PASSE` (absente = accès libre, cas du développement local). Cookie `solidia_acces` httpOnly portant un jeton HMAC signé (7 jours) ; drapeau `solidia_session_ouverte` sans secret pour afficher la déconnexion. Le proxy protège les pages, `garde-api.ts` protège en plus chaque route d'API pour que la clé Mistral ne soit pas consommable sans mot de passe. `maxDuration = 60` sur les routes de lecture et d'extraction (indispensable sur Vercel).
 - **Secrets** : `MISTRAL_API_KEY` dans `.env.local`, jamais préfixée `NEXT_PUBLIC_`, jamais affichée. Tout appel Mistral passe par `src/lib/mistral-ocr.ts` ou `src/lib/extraction/mistral-extraction.ts` (server-only).
-- **Certificat médical** : intégralement exploité (décision de l'utilisateur, 06/10/2026). Le cloisonnement « pli cacheté » introduit le 15/09 a été retiré à sa demande : pas de pages masquées, pas d'extraction partielle. Le GIR estimé reste présenté comme **indicatif**, l'évaluation AGGIR à domicile faisant foi.
+- **Certificat médical** : intégralement extrait et affiché (décision du 06/10/2026, le cloisonnement « pli cacheté » du 15/09 a été retiré). **Mais l'outil ne calcule aucun GIR** : l'utilisateur a explicitement refusé l'estimation le 06/10/2026. La règle de pré-instruction se borne à constater que le certificat est joint et à le transmettre à l'EMS, qui détermine le GIR. Ne pas réintroduire de score de dépendance.
 - **Identitovigilance** : jamais de rattachement automatique à un usager ; l'agent confirme.
 - **Données** : uniquement fictives. Les NIR et IBAN fictifs ont une clé valide mais ne correspondent à personne.
 - **Next.js 16** : lire `node_modules/next/dist/docs/` avant d'utiliser une API dont on n'est pas sûr. `LayoutProps`, `PageProps`, `RouteContext` sont des helpers globaux ; `params` est une promesse. Ne pas importer de constantes d'un module `"use client"` dans un composant serveur (le mode d'emploi importe `statuts.ts`, `decision.ts`, pas le store).
@@ -146,11 +153,11 @@ Journal (`journal` dans le store) : prise en charge, OCR, typage, corrections, v
 
 ## 9. Glossaire
 
-Solid'IA (l'outil), Solis (le logiciel métier de destination), APA, CERFA, NIR / NSS (15 chiffres), CNI, CMI, GIR (estimé à titre indicatif par l'outil, déterminé par l'EMS), EMS (équipe médico-sociale), GED, Solis (logiciel métier), bannette, vidéocodage, identitovigilance, date de dossier complet, MDPH, PCH, ACTP, MTP, PCRTP (non cumulables avec l'APA).
+Solid'IA (l'outil), Solis (le logiciel métier de destination), APA, CERFA, NIR / NSS (15 chiffres), CNI, CMI, GIR (déterminé par l'EMS, jamais calculé par l'outil), EMS (équipe médico-sociale), GED, Solis (logiciel métier), bannette, vidéocodage, identitovigilance, date de dossier complet, MDPH, PCH, ACTP, MTP, PCRTP (non cumulables avec l'APA).
 
 ## 10. Prochaines étapes
 
 1. Faire valider par l'utilisateur les règles, les seuils et délais (`PARAMETRES`), les textes de courriers.
 2. Supabase : tables dossiers, pièces, extractions, rapprochements, courriers, journal, usagers Solis simulés ; bannette partagée avec affectation et ancienneté ; remplacer `persist` par des routes API. L'utilisateur doit fournir l'URL et les clés du projet.
-3. Créer le dépôt GitHub, brancher Vercel (`MISTRAL_API_KEY` en variable d'environnement).
+3. Déploiement : tout est prêt (`DEPLOIEMENT.md`), reste à créer le dépôt GitHub et le projet Vercel, ce qui demande les identifiants de l'utilisateur (ni `gh` ni `vercel` ne sont installés sur la machine).
 4. Pistes : tableau de bord dans le module Dossiers (volumes, délais, stock en attente), relances et clôture faute de pièces, dégradations de scan, courriers en PDF, autres prestations des solidarités que l'APA (le nom Solid'IA couvre l'ensemble des solidarités).

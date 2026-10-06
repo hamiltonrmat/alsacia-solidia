@@ -141,7 +141,6 @@ async function main() {
   const decision = evaluerDecision({ pieces, lire, dateReception: fictif.dateReception, recevabilite: conformite.recevabilite });
   console.log(`\n[Pré-instruction] ${decision.orientation} — ${decision.recommandation}`);
   for (const r of decision.regles) console.log(`  ${r.statut.padEnd(13)} ${r.libelle} — ${r.detail}`);
-  if (decision.girEstime) console.log(`  GIR estimé ${decision.girEstime.gir} (${decision.girEstime.libelle})`);
   console.log(`\nDurée totale ${((Date.now() - debut) / 1000).toFixed(0)} s`);
 
   if (sortie) {

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { EnTete } from "@/components/en-tete";
+import { BoutonDeconnexion } from "@/components/bouton-deconnexion";
 import { MARQUE } from "@/lib/marque";
 import "./globals.css";
 
@@ -33,7 +34,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <p>
               <span className="font-semibold text-slate-700">{MARQUE.nom}</span> · {MARQUE.accroche.toLowerCase()} de la {MARQUE.collectivite}
             </p>
-            <p>{MARQUE.version} · données fictives, aucune donnée personnelle réelle</p>
+            <p className="flex items-center gap-3">
+              <span>{MARQUE.version} · données fictives, aucune donnée personnelle réelle</span>
+              <BoutonDeconnexion />
+            </p>
           </div>
         </footer>
       </body>

@@ -1,6 +1,7 @@
 import { statSync } from "node:fs";
 import path from "node:path";
 import { NextResponse } from "next/server";
+import { refuserSiNonAutorise } from "@/lib/garde-api";
 import { cheminPdfDossier, DOSSIERS_FICTIFS, LOTS_GED } from "@/data/dossiers-fictifs";
 
 /**
@@ -36,7 +37,10 @@ function tailleKo(cheminPublic: string): number {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const refus = refuserSiNonAutorise(request);
+  if (refus) return refus;
+
   // Petit délai pour rendre perceptible la « connexion » à la GED dans l'interface.
   await new Promise((r) => setTimeout(r, 500));
 

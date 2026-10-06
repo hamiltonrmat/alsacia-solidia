@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { refuserSiNonAutorise } from "@/lib/garde-api";
 import { genererNumeroDossier, genererNumeroUsager, rechercherCandidats, type CandidatSolis } from "@/data/solis";
 
 /**
@@ -24,6 +25,9 @@ type Corps =
     };
 
 export async function POST(request: Request) {
+  const refus = refuserSiNonAutorise(request);
+  if (refus) return refus;
+
   let corps: Corps;
   try {
     corps = (await request.json()) as Corps;

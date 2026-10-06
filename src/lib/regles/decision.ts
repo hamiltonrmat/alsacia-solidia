@@ -50,18 +50,10 @@ export function statutPourOrientation(orientation: Orientation): StatutDossier {
   }
 }
 
-export type GirEstime = {
-  gir: number;
-  libelle: string;
-  score: number;
-  itemsRenseignes: number;
-};
-
 export type ResultatDecision = {
   regles: Regle[];
   orientation: Orientation;
   recommandation: string;
-  girEstime?: GirEstime;
   calculeLe: string;
 };
 
@@ -78,56 +70,6 @@ export const LIBELLES_CAISSE: Record<string, string> = {
   msa: "la MSA",
   autre: "sa caisse de retraite",
 };
-
-const ITEMS_EVALUATION = [
-  "transferts",
-  "deplacement_interieur",
-  "deplacement_exterieur",
-  "prehension",
-  "motricite_fine",
-  "toilette",
-  "habillage",
-  "alimentation",
-  "elimination_urinaire",
-  "elimination_fecale",
-  "orientation_temps",
-  "orientation_espace",
-  "securite",
-  "comportement",
-];
-
-/**
- * Estimation indicative du GIR à partir de la grille du certificat médical.
- * Ce n'est pas la grille AGGIR : l'évaluation à domicile par l'équipe
- * médico-sociale fait foi. Sert à situer le dossier dans la file d'attente.
- */
-export function estimerGir(lire: Lecteur): GirEstime | undefined {
-  let score = 0;
-  let renseignes = 0;
-  for (const item of ITEMS_EVALUATION) {
-    const v = lire("certificat_medical", `evaluation.${item}`);
-    if (v === "non_realise") {
-      score += 2;
-      renseignes += 1;
-    } else if (v === "avec_aide") {
-      score += 1;
-      renseignes += 1;
-    } else if (v === "seul") {
-      renseignes += 1;
-    }
-  }
-  if (renseignes < 8) return undefined;
-  const normalise = (score / (renseignes * 2)) * 28;
-  const gir = normalise >= 20 ? 2 : normalise >= 12 ? 3 : normalise >= 6 ? 4 : normalise >= 3 ? 5 : 6;
-  const libelles: Record<number, string> = {
-    2: "Dépendance forte (GIR 1-2)",
-    3: "Dépendance moyenne (GIR 3)",
-    4: "Dépendance partielle (GIR 4)",
-    5: "Dépendance légère (GIR 5)",
-    6: "Autonomie conservée (GIR 6)",
-  };
-  return { gir, libelle: libelles[gir], score: Math.round(normalise), itemsRenseignes: renseignes };
-}
 
 export function evaluerDecision(entree: EntreeDecision): ResultatDecision {
   const { lire, dateReception, recevabilite } = entree;
@@ -210,24 +152,28 @@ export function evaluerDecision(entree: EntreeDecision): ResultatDecision {
       : { id: "cumul", libelle: "Règle de non-cumul", statut: "verifiee", detail: "Aucune prestation non cumulable déclarée." },
   );
 
-  // --- Perte d'autonomie, à titre indicatif ---------------------------------
-  const girEstime = estimerGir(lire);
+  // --- Éléments médicaux versés au dossier ----------------------------------
+  // L'outil restitue ce que le médecin a écrit ; il n'évalue pas la perte
+  // d'autonomie et ne calcule aucun GIR. Le GIR est déterminé par l'équipe
+  // médico-sociale lors de la visite à domicile.
   const cmJoint = entree.pieces.some((p) => p.type === "certificat_medical");
-  if (girEstime) {
-    const pathologies = lire("certificat_medical", "pathologies");
+  const dateCm = lire("certificat_medical", "date");
+  const medecinCm = lire("certificat_medical", "medecin_nom");
+  const pathologies = lire("certificat_medical", "pathologies");
+  if (cmJoint && (dateCm || medecinCm || pathologies)) {
     regles.push({
-      id: "gir",
-      libelle: "Perte d'autonomie (indicatif)",
-      statut: girEstime.gir <= 4 ? "verifiee" : "attention",
-      detail: `${girEstime.libelle} d'après la grille du certificat médical (${girEstime.itemsRenseignes} items renseignés). ${girEstime.gir <= 4 ? "Compatible avec l'APA (GIR 1 à 4)." : "Les GIR 5 et 6 n'ouvrent pas droit à l'APA."} L'évaluation AGGIR à domicile fait foi.${pathologies ? ` Pathologies déclarées : ${pathologies.slice(0, 160)}` : ""}`,
+      id: "certificat",
+      libelle: "Éléments médicaux versés au dossier",
+      statut: "verifiee",
+      detail: `Certificat médical joint${dateCm ? `, établi le ${dateCm}` : ""}${medecinCm ? ` par ${medecinCm}` : ""}. Il est transmis à l'équipe médico-sociale, à qui il revient d'évaluer la perte d'autonomie et de déterminer le GIR lors de la visite à domicile.${pathologies ? ` Pathologies déclarées : ${pathologies.slice(0, 200)}` : ""}`,
     });
   } else {
     regles.push({
-      id: "gir",
-      libelle: "Perte d'autonomie (indicatif)",
+      id: "certificat",
+      libelle: "Éléments médicaux versés au dossier",
       statut: "indeterminee",
       detail: cmJoint
-        ? "La grille d'évaluation du certificat médical n'a pas pu être lue suffisamment pour estimer un GIR. L'évaluation à domicile le déterminera."
+        ? "Un certificat médical est joint mais n'a pas pu être lu. L'équipe médico-sociale évaluera la perte d'autonomie à domicile."
         : "Aucun certificat médical joint (pièce facultative) : l'équipe médico-sociale évaluera la perte d'autonomie à domicile.",
     });
   }
@@ -252,7 +198,7 @@ export function evaluerDecision(entree: EntreeDecision): ResultatDecision {
     recommandation = `Conditions d'âge et de compétence remplies${recevabilite === "recevable_sous_reserve" ? ", sous réserve des points d'attention relevés" : ""}. Accuser réception et transmettre à l'équipe médico-sociale pour évaluation à domicile.`;
   }
 
-  return { regles, orientation, recommandation, girEstime, calculeLe: new Date().toISOString() };
+  return { regles, orientation, recommandation, calculeLe: new Date().toISOString() };
 }
 
 /** Destinataire de la transmission selon l'orientation retenue. */

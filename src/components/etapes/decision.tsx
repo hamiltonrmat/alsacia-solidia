@@ -142,17 +142,6 @@ export function EtapeDecision({ id }: { id: string }) {
         </Carte>
 
         <div className="flex flex-col gap-6">
-          {resultat.girEstime ? (
-            <Carte titre="Perte d'autonomie estimée" sousTitre="Indicatif, d'après le certificat médical">
-              <p className="text-2xl font-semibold">GIR {resultat.girEstime.gir}</p>
-              <p className="text-sm text-slate-600">{resultat.girEstime.libelle}</p>
-              <p className="mt-2 text-xs text-slate-500">
-                Score {resultat.girEstime.score}/28 sur {resultat.girEstime.itemsRenseignes} items. L&apos;évaluation AGGIR à domicile par l&apos;équipe
-                médico-sociale fait foi.
-              </p>
-            </Carte>
-          ) : null}
-
           <Carte titre="Orientation retenue par l'agent">
             <fieldset className="flex flex-col gap-2">
               <legend className="mb-1 text-sm text-slate-600">Choisir l&apos;orientation</legend>

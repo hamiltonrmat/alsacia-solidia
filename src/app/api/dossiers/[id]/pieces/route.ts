@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
+import { refuserSiNonAutorise } from "@/lib/garde-api";
 import { PDFDocument } from "pdf-lib";
 import { cheminPdfDossier, trouverDossierFictif } from "@/data/dossiers-fictifs";
 
@@ -11,8 +12,13 @@ import { cheminPdfDossier, trouverDossierFictif } from "@/data/dossiers-fictifs"
  */
 
 export const runtime = "nodejs";
+/** Les appels au service de lecture peuvent durer : 30 s de marge. */
+export const maxDuration = 30;
 
 export async function GET(request: Request, ctx: RouteContext<"/api/dossiers/[id]/pieces">) {
+  const refus = refuserSiNonAutorise(request);
+  if (refus) return refus;
+
   const { id } = await ctx.params;
   const dossier = trouverDossierFictif(id);
   if (!dossier) return NextResponse.json({ error: `Dossier ${id} inconnu.` }, { status: 404 });

@@ -23,7 +23,11 @@ cp .env.example .env.local   # puis renseigner MISTRAL_API_KEY
 npm run dev                   # http://localhost:3000
 ```
 
-Sur Vercel, renseigner `MISTRAL_API_KEY` dans les variables d'environnement du projet.
+Pour exiger le mot de passe en local : `SOLIDIA_MOT_DE_PASSE="demo" npm run dev`.
+
+## Déploiement
+
+La procédure complète est dans [DEPLOIEMENT.md](DEPLOIEMENT.md) : dépôt GitHub, projet Vercel et trois variables d'environnement (`MISTRAL_API_KEY`, `SOLIDIA_MOT_DE_PASSE`, `SOLIDIA_SECRET_SESSION`). L'entrée est protégée par un mot de passe unique ; sans la variable, l'accès est libre, ce qui ne convient qu'au développement local.
 
 ## Commandes
 

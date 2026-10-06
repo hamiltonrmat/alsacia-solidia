@@ -121,7 +121,7 @@ const ETAPES_GUIDE: EtapeGuide[] = [
       "À gauche, le document ; à droite, un onglet par pièce et le tableau des champs : libellé, valeur (modifiable), score de confiance, case « vérifié », extrait du texte d'où vient la valeur. Cliquer sur une ligne affiche la page du document où se trouve le champ.",
       "Les champs critiques portent une étoile : identité, date de naissance, numéro de sécurité sociale, questionnaire d'autonomie, mesure de protection, signature, validité de la pièce d'identité, IBAN, patient et date du certificat médical. Ils doivent être cochés « vérifié » ou corrigés.",
       "Les lignes non lues ou douteuses sont surlignées en ambre ; les lignes modifiées passent en bleu avec la mention « corrigé ».",
-      "Pour le certificat médical, tout le volet est extrait : identité du patient, pathologies, prises en charge, mobilité et grille d'évaluation de l'autonomie.",
+      "Pour le certificat médical, tout le volet est extrait : identité du patient, pathologies, prises en charge, mobilité et grille remplie par le médecin. L'outil restitue ces éléments sans en tirer de note.",
       "Sous le tableau, la carte « Rapprochement avec les usagers connus » présente les usagers du logiciel métier correspondant à l'identité lue, du plus sûr (numéro de sécurité sociale identique) au moins sûr (homonyme), avec leurs demandes antérieures.",
     ],
     actions: [
@@ -159,8 +159,8 @@ const ETAPES_GUIDE: EtapeGuide[] = [
     objectif: "Obtenir une orientation motivée par les règles administratives, puis retenir celle qui sera appliquée. L'agent d'accueil ne décide pas de l'attribution de l'aide : il oriente.",
     ecran: [
       "Un bandeau annonce l'orientation proposée et sa motivation.",
-      "La liste des règles appliquées : condition d'âge, organisme compétent d'après le questionnaire, lieu de résidence, département financeur, non-cumul, perte d'autonomie.",
-      "Quand la grille du certificat médical a été lue, une carte donne un GIR estimé, à titre indicatif : l'évaluation à domicile par l'équipe médico-sociale fait foi.",
+      "La liste des règles appliquées : condition d'âge, organisme compétent d'après le questionnaire, lieu de résidence, département financeur, non-cumul, éléments médicaux versés au dossier.",
+      "L'outil ne note pas la perte d'autonomie : il indique que le certificat médical est joint et le transmet. Le GIR est déterminé par l'équipe médico-sociale lors de la visite à domicile.",
       "La carte « Orientation retenue » propose les orientations possibles (celle du système est signalée « proposée »), affiche le destinataire, le statut que prendra le dossier et le courrier associé, et un champ de commentaire.",
     ],
     actions: [
@@ -256,9 +256,9 @@ export default function ModeDEmploi() {
             au logiciel métier sans son accord.
           </p>
           <Encart titre="Ce que l'outil ne fait pas">
-            Il ne décide pas de l&apos;attribution de l&apos;aide et n&apos;évalue pas la perte d&apos;autonomie : l&apos;évaluation à domicile par
-            l&apos;équipe médico-sociale fait foi, le GIR affiché n&apos;est qu&apos;une estimation indicative. Il ne remplace pas le logiciel métier.
-            Dans cette version de démonstration, la gestion documentaire et le logiciel métier sont simulés et tous les usagers sont fictifs.
+            Il ne décide pas de l&apos;attribution de l&apos;aide et n&apos;évalue pas la perte d&apos;autonomie : il ne calcule aucun GIR. L&apos;évaluation
+            à domicile par l&apos;équipe médico-sociale est la seule qui détermine le degré de dépendance. Il ne remplace pas le logiciel métier. Dans
+            cette version de démonstration, la gestion documentaire et le logiciel métier sont simulés et tous les usagers sont fictifs.
           </Encart>
         </Section>
 
@@ -303,7 +303,7 @@ export default function ModeDEmploi() {
               ["Vérifications déterministes", "Les identifiants à clé de contrôle (sécurité sociale, IBAN) sont relus dans le texte et vérifiés ; une case cochée invisible à la lecture est déduite quand les cases voisines sont visibles vides ; une case inventée par le modèle est démasquée."],
               ["Rapprochement d'identité", "L'identité lue est confrontée aux usagers connus, par numéro de sécurité sociale puis par état civil, homonymes compris. L'agent confirme ; une demande déjà en cours est signalée pour éviter les doublons."],
               ["Complétude, délais et courriers", "Pièces obligatoires et conditionnelles, formulaire complet et signé, cohérence entre pièces ; date de dossier complet, délais d'accusé de réception et de décision ; courriers générés (accusé de réception, demande de pièces, transmission, orientation)."],
-              ["Pré-instruction", `Condition d'âge (${PARAMETRES.ageMinimumApa} ans), organisme compétent d'après le questionnaire, résidence, département financeur, non-cumul, GIR estimé à titre indicatif. L'agent retient l'orientation et le statut en découle.`],
+              ["Pré-instruction", `Condition d'âge (${PARAMETRES.ageMinimumApa} ans), organisme compétent d'après le questionnaire, résidence, département financeur, non-cumul. L'agent retient l'orientation et le statut en découle.`],
               ["Enregistrement, transmission, retour GED", "Création ou rattachement de l'usager, création ou mise à jour de la demande avec son statut, transmission au destinataire, dépôt des pièces typées dans la GED sous l'usager."],
               ["Journal des actions", "Prise en charge, typage, corrections avec valeur avant et après, vérifications, rapprochement, recevabilité, courriers, orientation, enregistrement : tout est horodaté et consultable depuis le bandeau du dossier."],
             ].map(([titre, texte]) => (
@@ -561,7 +561,7 @@ export default function ModeDEmploi() {
                 <span className="font-medium text-slate-800">Non-cumul :</span> ACTP, aide sociale départementale à domicile, MTP, PCH et PCRTP ne se cumulent pas avec l&apos;APA. Leur perception est signalée.
               </li>
               <li>
-                <span className="font-medium text-slate-800">Perte d&apos;autonomie :</span> un GIR est estimé à partir de la grille du certificat médical (14 items), à titre indicatif. Les GIR 5 et 6 n&apos;ouvrent pas droit à l&apos;APA. L&apos;évaluation AGGIR à domicile fait foi.
+                <span className="font-medium text-slate-800">Perte d&apos;autonomie :</span> jamais évaluée par l&apos;outil. Le certificat médical est versé au dossier et transmis à l&apos;équipe médico-sociale, qui détermine le GIR lors de la visite à domicile.
               </li>
             </ul>
           </div>
@@ -646,7 +646,7 @@ export default function ModeDEmploi() {
               ["Combien de temps prend un dossier ?", "La lecture prend quelques secondes, l'extraction du formulaire une dizaine de secondes, les autres pièces deux à trois secondes chacune. Le reste dépend de l'agent : compter trois à six minutes pour un dossier de démonstration, vérification des champs critiques comprise."],
               ["Que devient une valeur que j'ai corrigée ?", "Elle prime sur la valeur lue pour toute la suite et reste marquée « corrigé » ; la valeur d'origine et la nouvelle sont consignées dans le journal. Vider la case revient à déclarer le champ non renseigné."],
               ["Pourquoi un dossier non recevable peut-il continuer ?", "Parce que la demande doit être enregistrée dès sa réception, avec le statut « en attente de pièces », et que la demande de pièces doit partir. Le délai d'instruction ne court qu'à partir du dossier complet."],
-              ["Le GIR affiché est-il la décision ?", "Non. C'est une estimation indicative calculée sur la grille du certificat médical, pour situer le dossier. L'évaluation AGGIR à domicile par l'équipe médico-sociale est la seule qui fasse foi."],
+              ["L'outil donne-t-il un GIR ?", "Non, jamais. Il lit le certificat médical et le transmet avec le dossier, mais il ne note pas la perte d'autonomie : le GIR est déterminé par l'équipe médico-sociale lors de la visite à domicile."],
               ["Où voir le texte lu par la machine ?", "Au contrôle des données, « Voir le texte OCR » affiche le texte de la pièce affichée. Le banc d'essai, dans la barre du haut, permet aussi de tester n'importe quel PDF ou image."],
             ].map(([q, r]) => (
               <div key={q} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -672,7 +672,7 @@ export default function ModeDEmploi() {
               ["NIR", "Numéro d'inscription au répertoire, dit numéro de sécurité sociale, 15 chiffres dont 2 de clé."],
               ["Date de dossier complet", "Date à laquelle toutes les pièces sont réunies ; point de départ du délai de décision."],
               ["EMS", "Équipe médico-sociale du département, qui évalue à domicile et établit le plan d'aide."],
-              ["GIR", "Groupe iso-ressources, de 1 à 6, déterminé par l'équipe médico-sociale. L'APA concerne les GIR 1 à 4."],
+              ["GIR", "Groupe iso-ressources, de 1 à 6, déterminé par l'équipe médico-sociale lors de la visite à domicile, jamais par l'outil. L'APA concerne les GIR 1 à 4."],
               ["CMI", "Carte mobilité inclusion, mentions stationnement, priorité ou invalidité."],
               ["MDPH", "Maison départementale des personnes handicapées, compétente pour la PCH."],
               ["PCH, ACTP, MTP, PCRTP", "Prestations liées au handicap ou à la tierce personne, non cumulables avec l'APA."],

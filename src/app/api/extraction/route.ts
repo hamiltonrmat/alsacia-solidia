@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { refuserSiNonAutorise } from "@/lib/garde-api";
 import type { TypePiece } from "@/lib/decoupage";
 import {
   extractionPrevuePour,
@@ -15,10 +16,15 @@ import {
  */
 
 export const runtime = "nodejs";
+/** Les appels au service de lecture peuvent durer : 60 s de marge. */
+export const maxDuration = 60;
 
 const MAX_CARACTERES = 60_000;
 
 export async function POST(request: Request) {
+  const refus = refuserSiNonAutorise(request);
+  if (refus) return refus;
+
   let corps: { type?: string; markdown?: string; modele?: string };
   try {
     corps = (await request.json()) as typeof corps;
