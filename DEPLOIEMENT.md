@@ -16,23 +16,24 @@ Vous aurez donc trois valeurs à renseigner :
 |---|---|---|
 | `MISTRAL_API_KEY` | Lecture des documents et extraction des champs | la clé de votre compte Mistral |
 | `SOLIDIA_MOT_DE_PASSE` | Mot de passe demandé à l'entrée | `cea-autonomie-2026` |
-| `SOLIDIA_SECRET_SESSION` | Signature du cookie de session | la sortie de la commande ci-dessus |
+| `SOLIDIA_SECRET_SESSION` | Clé de signature du ticket d'entrée, que personne ne saisit jamais | la sortie de la commande ci-dessus |
 
 Sans `SOLIDIA_MOT_DE_PASSE`, l'accès est libre : c'est voulu en développement local, à éviter en ligne.
 
-## 2. Mettre le projet sur GitHub
+`SOLIDIA_SECRET_SESSION` mérite un mot d'explication. Après une connexion réussie, le serveur dépose un ticket d'entrée dans le navigateur, pour ne pas redemander le mot de passe à chaque page. Ce ticket pourrait être fabriqué de toutes pièces par un visiteur : le serveur y apporte donc une signature calculée avec cette clé, que lui seul connaît. Vous n'avez rien à retenir et personne ne la saisit jamais. Elle est même facultative : sans elle, la signature est calculée à partir du mot de passe, ce qui fonctionne mais serait plus facile à deviner si le mot de passe était court.
 
-Le dépôt est pour l'instant local. Avec un compte GitHub :
+## 2. Le dépôt GitHub
+
+Fait le 06/10/2026 : le code est sur **https://github.com/hamiltonrmat/alsacia-solidia**, branche `main`. Le dépôt est public ; pour le fermer, Settings puis Change visibility. Rien de sensible n'y est versionné : `.env.local` est ignoré, seul `.env.example` est suivi, et la clé Mistral n'apparaît dans aucun commit.
+
+Pour pousser les évolutions suivantes :
 
 ```bash
 cd ~/Desktop/proto_ocr_codex
-git remote add origin https://github.com/<votre-compte>/solidia.git
-git push -u origin main
+git push
 ```
 
-Créez d'abord le dépôt **vide** sur github.com (sans README ni .gitignore, le dépôt local en a déjà). Le dépôt peut être privé : Vercel y accède après autorisation.
-
-Rien de sensible n'est versionné : `.env.local` est ignoré, seul `.env.example` est suivi.
+Vercel redéploie alors automatiquement.
 
 ## 3. Créer le projet Vercel
 
@@ -40,8 +41,8 @@ Deux chemins, au choix.
 
 **Depuis l'interface web**, le plus simple :
 
-1. Sur vercel.com, « Add New… » puis « Project ».
-2. Importer le dépôt GitHub. Vercel détecte Next.js tout seul : ne rien changer aux commandes de build.
+1. Ouvrir https://vercel.com/new.
+2. Importer le dépôt `alsacia-solidia`. Vercel détecte Next.js tout seul : ne rien changer aux commandes de build.
 3. Avant de cliquer sur « Deploy », déplier « Environment Variables » et saisir les trois variables du tableau ci-dessus, pour les trois environnements (Production, Preview, Development).
 4. Déployer.
 
