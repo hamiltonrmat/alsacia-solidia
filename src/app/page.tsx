@@ -42,12 +42,9 @@ export default function Accueil() {
               <h1>
                 <Image src={MARQUE.logo} alt={MARQUE.nom} width={900} height={305} priority className="h-28 w-auto sm:h-36" />
               </h1>
-              <p className="text-lg font-medium text-slate-700">
-                {MARQUE.accroche} de la {MARQUE.collectivite}
-              </p>
             </div>
             <p className="max-w-xl text-slate-600">
-              Du courrier numérisé au logiciel métier : le dossier est lu, découpé en pièces, contrôlé, rapproché de l&apos;usager et orienté en
+              Du courrier numérisé au logiciel métier : le dossier est lu par OCR, découpé en pièces, contrôlé, rapproché de l&apos;usager et orienté en
               quelques minutes, sous le regard de l&apos;agent qui garde la main à chaque étape.
             </p>
             <div className="flex flex-wrap gap-3">
