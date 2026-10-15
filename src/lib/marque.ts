@@ -4,9 +4,8 @@
  */
 export const MARQUE = {
   nom: "Solid'IA",
-  /** Découpage pour la mise en forme du logotype : « Solid » puis « IA ». */
-  nomDebut: "Solid'",
-  nomFin: "IA",
+  /** Logotype complet (pictogramme, nom et signature), fond transparent, 900 × 305. */
+  logo: "/solidia-logo.png",
   accroche: "Le traitement intelligent des dossiers des solidarités",
   collectivite: "Collectivité européenne d'Alsace",
   version: "Prototype v2",

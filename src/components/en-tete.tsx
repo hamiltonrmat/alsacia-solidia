@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MARQUE } from "@/lib/marque";
@@ -15,17 +16,8 @@ export function EnTete() {
   return (
     <header className="border-b border-slate-200 bg-white shadow-sm">
       <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3 sm:px-6">
-        <Link href="/" className="flex items-center gap-2.5">
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-sky-500 text-base font-bold text-white shadow-sm">
-            S
-          </span>
-          <span className="flex flex-col leading-tight">
-            <span className="text-lg font-semibold tracking-tight text-slate-900">
-              {MARQUE.nomDebut}
-              <span className="text-blue-600">{MARQUE.nomFin}</span>
-            </span>
-            <span className="hidden text-[11px] text-slate-500 sm:block">{MARQUE.collectivite}</span>
-          </span>
+        <Link href="/" className="flex items-center" title={`${MARQUE.nom} · ${MARQUE.collectivite}`}>
+          <Image src={MARQUE.logo} alt={MARQUE.nom} width={900} height={305} priority className="h-11 w-auto" />
         </Link>
 
         <nav aria-label="Modules" className="flex flex-wrap items-center gap-1">

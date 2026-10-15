@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { ApercuBannette } from "@/components/bannette";
 import { ETAPES } from "@/lib/etapes";
@@ -38,9 +39,8 @@ export default function Accueil() {
               {MARQUE.version} · démonstration
             </span>
             <div className="flex flex-col gap-3">
-              <h1 className="text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">
-                {MARQUE.nomDebut}
-                <span className="text-blue-600">{MARQUE.nomFin}</span>
+              <h1>
+                <Image src={MARQUE.logo} alt={MARQUE.nom} width={900} height={305} priority className="h-28 w-auto sm:h-36" />
               </h1>
               <p className="text-lg font-medium text-slate-700">
                 {MARQUE.accroche} de la {MARQUE.collectivite}

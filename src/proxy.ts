@@ -34,5 +34,5 @@ export const config = {
    * Tout est protégé, y compris les PDF de public/ged, sauf les ressources
    * techniques servies par Next.js et le favicon.
    */
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|solidia-logo.png).*)"],
 };

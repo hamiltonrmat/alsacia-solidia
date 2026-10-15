@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -38,17 +39,9 @@ export default async function PageConnexion({ searchParams }: PageProps<"/connex
     <main className="flex flex-1 items-center justify-center py-6">
       <div className="w-full max-w-md">
         <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-          <div className="flex items-center gap-3">
-            <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-sky-500 text-lg font-bold text-white shadow-sm">
-              S
-            </span>
-            <div>
-              <p className="text-xl font-semibold tracking-tight text-slate-900">
-                {MARQUE.nomDebut}
-                <span className="text-blue-600">{MARQUE.nomFin}</span>
-              </p>
-              <p className="text-xs text-slate-500">{MARQUE.collectivite}</p>
-            </div>
+          <div className="flex flex-col gap-2">
+            <Image src={MARQUE.logo} alt={MARQUE.nom} width={900} height={305} priority className="h-20 w-auto self-start" />
+            <p className="text-xs text-slate-500">{MARQUE.collectivite}</p>
           </div>
 
           <p className="mt-5 text-sm text-slate-600">
