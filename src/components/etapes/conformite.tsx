@@ -1,45 +1,42 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
+import { CarteRapport } from "@/components/rapport-pdf";
 import { Alerte, Badge, Bouton, Carte, Titre, useMonte, type Teinte } from "@/components/ui";
-import { courrierAccuseReception, courrierDemandePieces, dateLimiteAccuseReception, dateLimiteDecision, LIBELLES_COURRIER, type ContexteCourrier } from "@/lib/courriers";
 import { LIBELLES_PIECES, TYPES_A_ECARTER } from "@/lib/decoupage";
-import { identiteLue, lecteurDepuisDossier, nomUsager, pagesCerfaPresentes, rapprochementPourConformite } from "@/lib/dossier-utils";
-import { evaluerConformite, LIBELLES_RECEVABILITE, type StatutControle } from "@/lib/regles/conformite";
+import { lecteurDepuisDossier, pagesCerfaPresentes, rapprochementPourConformite } from "@/lib/dossier-utils";
+import { construireRapport } from "@/lib/rapport/construire";
+import {
+  ancreRegle,
+  dateLimiteAccuseReception,
+  evaluerConformite,
+  LIBELLES_FAMILLE,
+  LIBELLES_STATUT_CONTROLE,
+  LIBELLES_VERDICT,
+  type StatutControle,
+} from "@/lib/regles/conformite";
 import { PARAMETRES } from "@/lib/regles/parametres";
-import { useDossierStore, type EtatDossier } from "@/store/dossier-store";
+import { useDossierStore } from "@/store/dossier-store";
 
-const STATUTS: Record<StatutControle, { libelle: string; teinte: Teinte; icone: string }> = {
-  bloquant: { libelle: "Bloquant", teinte: "danger", icone: "✕" },
-  alerte: { libelle: "Alerte", teinte: "attention", icone: "!" },
-  info: { libelle: "Information", teinte: "info", icone: "i" },
-  ok: { libelle: "Conforme", teinte: "succes", icone: "✓" },
-  non_applicable: { libelle: "Sans objet", teinte: "neutre", icone: "–" },
+const STATUTS: Record<StatutControle, { teinte: Teinte; icone: string; fond: string }> = {
+  bloquant: { teinte: "danger", icone: "✕", fond: "bg-red-600" },
+  alerte: { teinte: "attention", icone: "!", fond: "bg-amber-500" },
+  info: { teinte: "info", icone: "i", fond: "bg-sky-500" },
+  ok: { teinte: "succes", icone: "✓", fond: "bg-emerald-600" },
+  non_applicable: { teinte: "neutre", icone: "–", fond: "bg-slate-400" },
 };
 
 const ORDRE: StatutControle[] = ["bloquant", "alerte", "info", "ok", "non_applicable"];
-
-export function contexteCourrier(dossier: EtatDossier): ContexteCourrier {
-  const identite = identiteLue(dossier);
-  return {
-    civilite: identite.civilite,
-    nomUsager: nomUsager(dossier),
-    numeroEnregistrement: dossier.numeroEnregistrement,
-    dateReception: dossier.dateReception,
-    dateCompletude: dossier.dateCompletude,
-  };
-}
 
 export function EtapeConformite({ id }: { id: string }) {
   const router = useRouter();
   const monte = useMonte();
   const dossier = useDossierStore((s) => s.dossiers[id]);
   const definirConformite = useDossierStore((s) => s.definirConformite);
+  const definirObservations = useDossierStore((s) => s.definirObservations);
   const validerConformite = useDossierStore((s) => s.validerConformite);
-  const ajouterCourrier = useDossierStore((s) => s.ajouterCourrier);
   const revenirA = useDossierStore((s) => s.revenirA);
-  const [courrierOuvert, setCourrierOuvert] = useState(false);
 
   const pieces = dossier?.pieces;
   const pagesClassees = dossier?.pagesClassees;
@@ -70,26 +67,20 @@ export function EtapeConformite({ id }: { id: string }) {
   if (!monte || !dossier) return null;
   if (!resultat) return <Alerte teinte="attention">Les extractions ne sont pas disponibles. Revenez au contrôle des données.</Alerte>;
 
-  const teinteRecevabilite: Teinte = resultat.recevabilite === "recevable" ? "succes" : resultat.recevabilite === "recevable_sous_reserve" ? "attention" : "danger";
+  const teinteVerdict: Teinte = resultat.verdict === "conforme" ? "succes" : resultat.verdict === "conforme_sous_reserve" ? "attention" : "danger";
   const parStatut = ORDRE.map((s) => ({ statut: s, controles: resultat.controles.filter((c) => c.statut === s) })).filter((g) => g.controles.length > 0);
-  const nonRecevable = resultat.recevabilite === "non_recevable";
-  const typeCourrier = nonRecevable ? "demande_pieces" : "accuse_reception";
-  const courrierExistant = dossier.courriers.find((c) => c.type === typeCourrier);
+  const incomplet = resultat.verdict === "non_conforme";
+  const completude = incomplet ? null : (dossier.dateCompletude ?? dossier.dateReception);
   const limiteAr = dateLimiteAccuseReception(dossier.dateReception);
-  const completude = nonRecevable ? null : (dossier.dateCompletude ?? dossier.dateReception);
-  const limiteDecision = completude ? dateLimiteDecision(completude) : null;
+  const rapportAJour = Boolean(dossier.rapport && dossier.rapport.revision === dossier.revision);
+  const rapportPerime = Boolean(dossier.rapport && !rapportAJour && !dossier.export);
 
-  function genererCourrier() {
+  function valider() {
     if (!dossier || !resultat) return;
-    const ctx = { ...contexteCourrier(dossier), dateCompletude: dossier.dateCompletude ?? dossier.dateReception };
-    const texte = nonRecevable ? courrierDemandePieces(ctx, resultat.piecesManquantes) : courrierAccuseReception(ctx);
-    ajouterCourrier(id, { type: typeCourrier, libelle: LIBELLES_COURRIER[typeCourrier], texte });
-    setCourrierOuvert(true);
-  }
-
-  function suivant() {
-    validerConformite(id);
-    router.push(`/dossiers/${id}/decision`);
+    const genereLe = new Date().toISOString();
+    const rapport = construireRapport(dossier, { conformite: resultat, dateCompletude: completude, genereLe });
+    validerConformite(id, { conformite: resultat, dateCompletude: completude, rapport });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function retour() {
@@ -100,50 +91,80 @@ export function EtapeConformite({ id }: { id: string }) {
   return (
     <main className="flex flex-col gap-6">
       <Titre
-        surtitre="Étape 3"
-        titre="Complétude et recevabilité"
-        description="Présence des pièces obligatoires et conditionnelles, formulaire complet et signé, validité et cohérence de chaque pièce avec le formulaire, rapprochement avec l'usager connu. Le verdict fixe la date de dossier complet et le courrier à adresser à l'usager."
+        surtitre="Étape 4"
+        titre="Complétude et conformité"
+        description="Le moteur de règles métier vérifie la présence des pièces obligatoires et conditionnelles, le formulaire complet et signé, la validité et la cohérence de chaque pièce avec le formulaire, et le rapprochement avec l'usager connu. Il ne se prononce pas sur le droit à la prestation : tout dossier est transmis à Solis, où l'instruction en décide. La validation fixe la date de dossier complet et génère le rapport de contrôle."
         actions={
           <>
             <Bouton variante="secondaire" onClick={retour}>
               Retour au contrôle des données
             </Bouton>
-            <Bouton onClick={suivant}>Valider et passer à la pré-instruction</Bouton>
+            {rapportAJour && !dossier.export ? (
+              <Bouton href={`/dossiers/${id}/export`}>Passer à l&apos;enregistrement et la transmission</Bouton>
+            ) : dossier.export ? null : (
+              <Bouton onClick={valider}>{dossier.rapport ? "Valider et régénérer le rapport" : "Valider et générer le rapport"}</Bouton>
+            )}
           </>
         }
       />
 
-      <Alerte teinte={teinteRecevabilite} titre={LIBELLES_RECEVABILITE[resultat.recevabilite]}>
+      <Alerte teinte={teinteVerdict} titre={LIBELLES_VERDICT[resultat.verdict]}>
         {resultat.synthese}
       </Alerte>
 
+      {rapportPerime ? (
+        <Alerte teinte="attention" titre="Le rapport de contrôle n'est plus à jour">
+          Le dossier a été modifié depuis la génération du rapport. Validez à nouveau pour le régénérer avant la transmission.
+          <div className="mt-2">
+            <Bouton onClick={valider}>Valider et régénérer le rapport</Bouton>
+          </div>
+        </Alerte>
+      ) : null}
+
+      {rapportAJour ? <CarteRapport dossier={dossier} apercuOuvert={!dossier.export} /> : null}
+
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <Carte titre="Contrôles" sousTitre={`${resultat.controles.length} contrôles appliqués`}>
+        <Carte
+          titre="Contrôles"
+          sousTitre={`${resultat.controles.length} règles appliquées`}
+          actions={
+            <a href="/regles" target="_blank" rel="noreferrer" className="text-sm font-medium text-blue-700 hover:underline">
+              Toutes les règles métier ↗
+            </a>
+          }
+        >
           <div className="flex flex-col gap-5">
             {parStatut.map((groupe) => (
               <div key={groupe.statut} className="flex flex-col gap-2">
                 <div className="flex items-center gap-2">
-                  <Badge teinte={STATUTS[groupe.statut].teinte}>{STATUTS[groupe.statut].libelle}</Badge>
+                  <Badge teinte={STATUTS[groupe.statut].teinte}>{LIBELLES_STATUT_CONTROLE[groupe.statut]}</Badge>
                   <span className="text-xs text-slate-500">{groupe.controles.length}</span>
                 </div>
                 <ul className="flex flex-col gap-2">
                   {groupe.controles.map((c) => (
                     <li key={c.id} className="flex gap-3 rounded-md border border-slate-200 p-3">
                       <span
-                        className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                          c.statut === "ok" ? "bg-emerald-600 text-white" : c.statut === "bloquant" ? "bg-red-600 text-white" : c.statut === "alerte" ? "bg-amber-500 text-white" : "bg-sky-500 text-white"
-                        }`}
+                        className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${STATUTS[c.statut].fond}`}
                         aria-hidden
                       >
                         {STATUTS[c.statut].icone}
                       </span>
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="font-medium">
                           {c.libelle}
-                          {c.piece ? <span className="ml-2 text-xs font-normal text-slate-500">{LIBELLES_PIECES[c.piece]}</span> : null}
+                          <span className="ml-2 text-xs font-normal text-slate-500">{LIBELLES_FAMILLE[c.famille]}</span>
                         </p>
                         <p className="text-sm text-slate-600">{c.detail}</p>
                       </div>
+                      <a
+                        href={`/regles#${ancreRegle(c.id)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        title="Ouvrir la règle dans un nouvel onglet"
+                        className="shrink-0 self-start text-xs font-medium text-blue-700 hover:underline"
+                      >
+                        Voir la règle ↗
+                      </a>
                     </li>
                   ))}
                 </ul>
@@ -153,53 +174,39 @@ export function EtapeConformite({ id }: { id: string }) {
         </Carte>
 
         <div className="flex flex-col gap-6">
-          <Carte titre="Délais" sousTitre="Réglementaires, à compter de la réception">
+          <Carte titre="Dates" sousTitre="À compter de la réception">
             <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
               <dt className="text-slate-500">Réception</dt>
               <dd>{dossier.dateReception}</dd>
               <dt className="text-slate-500">Accusé de réception</dt>
               <dd>
-                avant le <strong>{limiteAr ?? "—"}</strong> ({PARAMETRES.joursAccuseReception} jours)
+                avant le <strong>{limiteAr ?? "—"}</strong> ({PARAMETRES.joursAccuseReception} jours), émis depuis Solis
               </dd>
               <dt className="text-slate-500">Dossier complet</dt>
-              <dd>{completude ? <strong>{completude}</strong> : <span className="text-amber-700">en attente de pièces</span>}</dd>
-              <dt className="text-slate-500">Décision attendue</dt>
-              <dd>{limiteDecision ? <>avant le <strong>{limiteDecision}</strong> ({PARAMETRES.moisDecision} mois après complétude)</> : "à compter de la réception des pièces"}</dd>
+              <dd>{completude ? <strong>{completude}</strong> : <span className="text-amber-700">non fixée, dossier incomplet</span>}</dd>
             </dl>
           </Carte>
 
-          <Carte
-            titre="Courrier à l'usager"
-            sousTitre={LIBELLES_COURRIER[typeCourrier]}
-            actions={
-              <Bouton variante="secondaire" onClick={courrierExistant ? () => setCourrierOuvert((v) => !v) : genererCourrier}>
-                {courrierExistant ? (courrierOuvert ? "Masquer" : "Afficher") : "Générer le courrier"}
-              </Bouton>
-            }
-          >
-            {nonRecevable ? (
-              <div className="flex flex-col gap-2">
-                <p className="text-sm text-slate-600">Pièces à réclamer :</p>
-                <ul className="list-disc pl-5 text-sm">
-                  {resultat.piecesManquantes.map((p) => (
-                    <li key={p}>{p}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : (
-              <p className="text-sm text-slate-600">Le dossier est complet : l&apos;accusé de réception fixe la date de complétude et annonce la visite à domicile.</p>
-            )}
-            {courrierExistant ? (
-              <p className="mt-2 text-xs text-slate-500">Généré le {new Date(courrierExistant.genereLe).toLocaleString("fr-FR")}.</p>
-            ) : null}
-            {courrierExistant && courrierOuvert ? (
-              <div className="mt-2 flex flex-col gap-2">
-                <textarea readOnly value={courrierExistant.texte} rows={16} className="w-full rounded-md border border-slate-300 bg-white p-3 font-mono text-xs" />
-                <Bouton variante="secondaire" onClick={genererCourrier}>
-                  Régénérer
-                </Bouton>
-              </div>
-            ) : null}
+          {resultat.piecesManquantes.length ? (
+            <Carte titre="Pièces manquantes" sousTitre="Listées dans le rapport, réclamées depuis Solis">
+              <ul className="list-disc pl-5 text-sm">
+                {resultat.piecesManquantes.map((p) => (
+                  <li key={p}>{p}</li>
+                ))}
+              </ul>
+            </Carte>
+          ) : null}
+
+          <Carte titre="Observations pour l'instruction" sousTitre="Reprises dans le rapport de contrôle">
+            <textarea
+              value={dossier.observations ?? ""}
+              onChange={(e) => definirObservations(id, e.target.value)}
+              rows={5}
+              disabled={Boolean(dossier.export)}
+              placeholder="Points à signaler à l'agent instructeur, précisions sur une pièce, échange avec l'usager…"
+              className="w-full rounded-md border border-slate-300 bg-white p-2 text-sm disabled:bg-slate-50"
+              aria-label="Observations pour l'instruction"
+            />
           </Carte>
 
           <Carte titre="Pièces du dossier">

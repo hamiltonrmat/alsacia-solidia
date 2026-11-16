@@ -8,7 +8,13 @@ export const MARQUE = {
   logo: "/solidia-logo.png",
   accroche: "Le traitement intelligent des dossiers des solidarités",
   collectivite: "Collectivité européenne d'Alsace",
-  version: "Prototype v2",
+  /**
+   * Version 3 (16/11/2026) : traitement de la GED à Solis sans appréciation
+   * du droit, moteur de règles métier consultable, rapport de contrôle.
+   * Version 2 : Next.js, OCR et pré-instruction. Version 1 : maquette statique.
+   */
+  version: "Prototype v3",
+  versionCourte: "v3",
 } as const;
 
 /** Signature complète, en une ligne. */

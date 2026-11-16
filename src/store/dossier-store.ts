@@ -3,20 +3,20 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import type { CandidatSolis } from "@/data/solis";
-import type { TypeCourrier } from "@/lib/courriers";
 import type { PageClassee, Piece, TypePiece } from "@/lib/decoupage";
 import { ETAPES as DESCRIPTION_ETAPES } from "@/lib/etapes";
-import type { ResultatConformite } from "@/lib/regles/conformite";
-import type { Orientation, ResultatDecision } from "@/lib/regles/decision";
+import type { RapportControle } from "@/lib/rapport/modele";
+import { LIBELLES_VERDICT, type ResultatConformite, type Verdict } from "@/lib/regles/conformite";
 import type { StatutDossier } from "@/lib/statuts";
 
 /**
- * État de travail des dossiers en cours de pré-instruction, conservé dans le
- * navigateur (localStorage). Un dossier importé depuis la GED progresse
- * d'étape en étape ; chaque action de l'agent est journalisée.
+ * État de travail des dossiers en cours de traitement, conservé dans le
+ * navigateur (localStorage). Un dossier pris en charge depuis la GED
+ * progresse d'étape en étape ; chaque action de l'agent est journalisée.
  */
 
-export type Etape = "decoupage" | "extraction" | "conformite" | "decision" | "export" | "termine";
+/** Étape courante d'un dossier pris en charge (la GED est derrière lui). */
+export type Etape = "decoupage" | "extraction" | "conformite" | "export" | "termine";
 
 /** Les cinq étapes, décrites dans src/lib/etapes.ts. */
 export const ETAPES = DESCRIPTION_ETAPES;
@@ -44,8 +44,6 @@ export type Rapprochement = {
   confirmeLe?: string;
 };
 
-export type Courrier = { type: TypeCourrier; libelle: string; genereLe: string; texte: string };
-
 export type EvenementJournal = {
   horodatage: string;
   contexte: string;
@@ -55,14 +53,28 @@ export type EvenementJournal = {
   apres?: string | null;
 };
 
-export type DecisionAgent = {
-  resultat: ResultatDecision;
-  orientationRetenue?: Orientation;
-  commentaire?: string;
-  valideLe?: string;
+/** Rapport de contrôle figé à la validation de la complétude. */
+export type RapportStocke = {
+  donnees: RapportControle;
+  /** Révision du dossier au moment de la génération : un écart signale un rapport périmé. */
+  revision: number;
+  /** Empreinte SHA-256 du PDF, renvoyée par le serveur à la mise en page. */
+  empreinte?: string;
+  tailleOctets?: number;
+  nbPages?: number;
 };
 
 export type DocumentRetourGed = { pieceId: string; type: TypePiece; pages: number[] };
+
+/** Document déposé dans Solis avec la demande. */
+export type DocumentSolis = {
+  reference: string;
+  type: "rapport_controle";
+  nom: string;
+  empreinte: string;
+  tailleOctets: number;
+  nbPages: number;
+};
 
 export type ExportSolis = {
   action: "cree" | "rattache" | "mis_a_jour";
@@ -72,6 +84,7 @@ export type ExportSolis = {
   horodatage: string;
   metadonnees: Record<string, unknown>;
   retourGed: DocumentRetourGed[];
+  documents: DocumentSolis[];
 };
 
 export type EtatDossier = {
@@ -85,6 +98,8 @@ export type EtatDossier = {
   numeroEnregistrement: string;
   statut: StatutDossier;
   etape: Etape;
+  /** Incrémentée à chaque modification des données du dossier. */
+  revision: number;
   ocr?: { pages: PageOcr[]; modele: string; dureeMs: number };
   pagesClassees?: PageClassee[];
   pieces?: Piece[];
@@ -96,14 +111,15 @@ export type EtatDossier = {
   conformiteValideeLe?: string;
   /** JJ/MM/AAAA, date à laquelle toutes les pièces sont réunies. */
   dateCompletude?: string;
-  courriers: Courrier[];
-  decision?: DecisionAgent;
+  /** Observations de l'agent à l'attention de l'instruction, reprises dans le rapport. */
+  observations?: string;
+  rapport?: RapportStocke;
   export?: ExportSolis;
   journal: EvenementJournal[];
 };
 
 type Actions = {
-  importerDossier: (dossier: Omit<EtatDossier, "importeLe" | "etape" | "extractions" | "courriers" | "journal" | "statut" | "numeroEnregistrement">) => void;
+  importerDossier: (dossier: Omit<EtatDossier, "importeLe" | "etape" | "extractions" | "journal" | "statut" | "numeroEnregistrement" | "revision">) => void;
   supprimerDossier: (id: string) => void;
   journaliser: (id: string, evenement: Omit<EvenementJournal, "horodatage">) => void;
   definirOcr: (id: string, ocr: EtatDossier["ocr"]) => void;
@@ -116,9 +132,9 @@ type Actions = {
   definirRapprochement: (id: string, rapprochement: Rapprochement) => void;
   confirmerRapprochement: (id: string, decision: NonNullable<Rapprochement["decision"]>) => void;
   definirConformite: (id: string, conformite: ResultatConformite) => void;
-  validerConformite: (id: string) => void;
-  ajouterCourrier: (id: string, courrier: Omit<Courrier, "genereLe">) => void;
-  definirDecision: (id: string, decision: DecisionAgent, statut?: StatutDossier) => void;
+  definirObservations: (id: string, observations: string) => void;
+  validerConformite: (id: string, validation: { conformite: ResultatConformite; dateCompletude: string | null; rapport: RapportControle }) => void;
+  definirMiseEnPageRapport: (id: string, miseEnPage: { empreinte: string; tailleOctets: number; nbPages: number }) => void;
   definirExport: (id: string, exportSolis: ExportSolis) => void;
   revenirA: (id: string, etape: Etape) => void;
 };
@@ -165,6 +181,12 @@ export const useDossierStore = create<Store>()(
     (set) => {
       const modifier = (id: string, fn: (d: EtatDossier) => EtatDossier) =>
         set((s) => (s.dossiers[id] ? { dossiers: { ...s.dossiers, [id]: fn(s.dossiers[id]) } } : s));
+      /** Modification des données du dossier : incrémente la révision. */
+      const modifierDonnees = (id: string, fn: (d: EtatDossier) => EtatDossier) =>
+        modifier(id, (d) => {
+          const suivant = fn(d);
+          return suivant === d ? d : { ...suivant, revision: (d.revision ?? 0) + 1 };
+        });
       const avecJournal = (d: EtatDossier, e: EvenementJournal): EtatDossier => ({ ...d, journal: [...d.journal, e] });
 
       return {
@@ -179,9 +201,9 @@ export const useDossierStore = create<Store>()(
                 numeroEnregistrement: numeroEnregistrement(),
                 statut: "recu",
                 etape: "decoupage",
+                revision: 0,
                 extractions: {},
-                courriers: [],
-                journal: [evenement("import", "Dossier importé depuis la GED", `${dossier.nbPages} pages, reçu le ${dossier.dateReception}`)],
+                journal: [evenement("import", "Dossier pris en charge depuis la GED", `${dossier.nbPages} pages, reçu le ${dossier.dateReception}`)],
               },
             },
           })),
@@ -195,19 +217,19 @@ export const useDossierStore = create<Store>()(
         definirOcr: (id, ocr) =>
           modifier(id, (d) => avecJournal({ ...d, ocr }, evenement("import", "OCR terminé", ocr ? `${ocr.pages.length} pages, ${ocr.modele}, ${(ocr.dureeMs / 1000).toFixed(1)} s` : undefined))),
         definirDecoupage: (id, pagesClassees, pieces, motif) =>
-          modifier(id, (d) => {
+          modifierDonnees(id, (d) => {
             const suivant = { ...d, pagesClassees, pieces };
-            return motif ? avecJournal(suivant, evenement("typage", motif)) : suivant;
+            return motif ? avecJournal(suivant, evenement("deliassage", motif)) : suivant;
           }),
         validerDecoupage: (id) =>
           modifier(id, (d) =>
             avecJournal(
               { ...d, decoupageValideLe: maintenant(), etape: "extraction", statut: d.statut === "recu" ? "en_cours" : d.statut },
-              evenement("typage", "Typage des pièces validé", (d.pieces ?? []).map((p) => `${p.type} p.${p.pages.join(",")}`).join(" ; ")),
+              evenement("deliassage", "Déliassage validé", (d.pieces ?? []).map((p) => `${p.type} p.${p.pages.join(",")}`).join(" ; ")),
             ),
           ),
         definirExtraction: (id, extraction) =>
-          modifier(id, (d) =>
+          modifierDonnees(id, (d) =>
             avecJournal(
               { ...d, extractions: { ...d.extractions, [extraction.pieceId]: extraction } },
               extraction.erreur
@@ -216,22 +238,27 @@ export const useDossierStore = create<Store>()(
             ),
           ),
         corrigerChamp: (id, pieceId, chemin, libelle, avant, valeur) =>
-          modifier(id, (d) => {
+          modifierDonnees(id, (d) => {
             const extraction = d.extractions[pieceId];
             if (!extraction) return d;
-            return avecJournal(
-              {
-                ...d,
-                extractions: {
-                  ...d.extractions,
-                  [pieceId]: { ...extraction, corrections: { ...extraction.corrections, [chemin]: valeur } },
-                },
+            // Une saisie au clavier produit une modification par touche : les
+            // modifications successives d'un même champ forment un seul événement,
+            // qui garde la valeur d'origine et la dernière valeur.
+            const action = `Champ corrigé : ${libelle}`;
+            const dernier = d.journal[d.journal.length - 1];
+            const memeChamp = dernier !== undefined && dernier.contexte === "controle" && dernier.action === action && dernier.detail === extraction.type;
+            const e = evenement("controle", action, extraction.type, memeChamp ? (dernier.avant ?? null) : avant, valeur);
+            return {
+              ...d,
+              extractions: {
+                ...d.extractions,
+                [pieceId]: { ...extraction, corrections: { ...extraction.corrections, [chemin]: valeur } },
               },
-              evenement("controle", `Champ corrigé : ${libelle}`, extraction.type, avant, valeur),
-            );
+              journal: memeChamp ? [...d.journal.slice(0, -1), e] : [...d.journal, e],
+            };
           }),
         confirmerChamp: (id, pieceId, chemin, confirme) =>
-          modifier(id, (d) => {
+          modifierDonnees(id, (d) => {
             const extraction = d.extractions[pieceId];
             if (!extraction) return d;
             const confirmations = { ...extraction.confirmations };
@@ -253,9 +280,9 @@ export const useDossierStore = create<Store>()(
               evenement("controle", "Contrôle des données validé", `${nbConfirmes} champ(s) critique(s) vérifié(s), ${nbCorriges} correction(s)`),
             );
           }),
-        definirRapprochement: (id, rapprochement) => modifier(id, (d) => ({ ...d, rapprochement })),
+        definirRapprochement: (id, rapprochement) => modifierDonnees(id, (d) => ({ ...d, rapprochement })),
         confirmerRapprochement: (id, decision) =>
-          modifier(id, (d) => {
+          modifierDonnees(id, (d) => {
             if (!d.rapprochement) return d;
             return avecJournal(
               { ...d, rapprochement: { ...d.rapprochement, decision, confirmeLe: maintenant() } },
@@ -267,39 +294,35 @@ export const useDossierStore = create<Store>()(
             );
           }),
         definirConformite: (id, conformite) => modifier(id, (d) => ({ ...d, conformite })),
-        validerConformite: (id) =>
+        definirObservations: (id, observations) => modifierDonnees(id, (d) => ({ ...d, observations })),
+        validerConformite: (id, { conformite, dateCompletude, rapport }) =>
           modifier(id, (d) => {
-            const recevable = d.conformite?.recevabilite !== "non_recevable";
-            return avecJournal(
+            let suivant = avecJournal(
               {
                 ...d,
+                conformite,
                 conformiteValideeLe: maintenant(),
-                etape: "decision",
-                dateCompletude: recevable ? (d.dateCompletude ?? d.dateReception) : d.dateCompletude,
-                statut: recevable ? "en_cours" : "en_attente_pieces",
+                dateCompletude: dateCompletude ?? undefined,
+                etape: "export",
+                statut: "en_cours",
+                rapport: { donnees: rapport, revision: d.revision ?? 0 },
               },
-              evenement("recevabilite", `Recevabilité : ${d.conformite?.recevabilite ?? "non évaluée"}`, d.conformite?.synthese),
+              evenement("completude", `Complétude et conformité validées : ${LIBELLES_VERDICT[conformite.verdict].toLowerCase()}`, conformite.synthese),
             );
+            if (d.observations?.trim()) suivant = avecJournal(suivant, evenement("completude", "Observations pour l'instruction", d.observations.trim()));
+            return avecJournal(suivant, evenement("rapport", "Rapport de contrôle généré", `Indice de robustesse OCR ${rapport.ocr.global.indice ?? "—"} / 100`));
           }),
-        ajouterCourrier: (id, courrier) =>
-          modifier(id, (d) =>
-            avecJournal(
-              { ...d, courriers: [...d.courriers.filter((c) => c.type !== courrier.type), { ...courrier, genereLe: maintenant() }] },
-              evenement("courrier", `Courrier généré : ${courrier.libelle}`),
-            ),
-          ),
-        definirDecision: (id, decision, statut) =>
-          modifier(id, (d) => {
-            const suivant = { ...d, decision, etape: decision.valideLe ? ("export" as Etape) : d.etape, statut: statut ?? d.statut };
-            return decision.valideLe
-              ? avecJournal(suivant, evenement("pre-instruction", `Orientation retenue : ${decision.orientationRetenue ?? decision.resultat.orientation}`, decision.commentaire))
-              : suivant;
-          }),
+        definirMiseEnPageRapport: (id, miseEnPage) =>
+          modifier(id, (d) => (d.rapport ? { ...d, rapport: { ...d.rapport, ...miseEnPage } } : d)),
         definirExport: (id, exportSolis) =>
           modifier(id, (d) =>
             avecJournal(
               { ...d, export: exportSolis, etape: "termine", statut: exportSolis.statut },
-              evenement("transmission", `Enregistré dans Solis (${exportSolis.action})`, `Usager ${exportSolis.numeroUsager}, demande ${exportSolis.numeroDossier}, ${exportSolis.retourGed.length} pièce(s) déposée(s) dans la GED`),
+              evenement(
+                "transmission",
+                `Enregistré dans Solis (${exportSolis.action})`,
+                `Usager ${exportSolis.numeroUsager}, demande ${exportSolis.numeroDossier}, ${exportSolis.documents.length} rapport(s) et ${exportSolis.retourGed.length} pièce(s) déposés`,
+              ),
             ),
           ),
         revenirA: (id, etape) => modifier(id, (d) => avecJournal({ ...d, etape }, evenement("navigation", `Retour à l'étape « ${ETAPES.find((e) => e.id === etape)?.libelle ?? etape} »`))),
@@ -307,29 +330,64 @@ export const useDossierStore = create<Store>()(
     },
     {
       name: CLE_STOCKAGE,
-      version: 2,
+      version: 3,
       storage: createJSONStorage(() => stockageAvecReprise),
-      migrate: (etat) => {
-        // Complète les dossiers enregistrés par une version antérieure.
-        const s = etat as { dossiers?: Record<string, Partial<EtatDossier>> };
-        const dossiers: Record<string, EtatDossier> = {};
-        for (const [id, d] of Object.entries(s.dossiers ?? {})) {
-          dossiers[id] = {
-            ...(d as EtatDossier),
-            numeroEnregistrement: d.numeroEnregistrement ?? numeroEnregistrement(),
-            statut: d.statut ?? (d.etape === "termine" ? "clos" : d.etape === "decoupage" ? "recu" : "en_cours"),
-            courriers: d.courriers ?? [],
-            journal: d.journal ?? [],
-            extractions: Object.fromEntries(
-              Object.entries(d.extractions ?? {}).map(([k, e]) => [k, { ...e, confirmations: e.confirmations ?? {} }]),
-            ),
-          };
-        }
-        return { dossiers };
-      },
+      migrate: (etat) => migrerDossiers(etat),
     },
   ),
 );
+
+/**
+ * Complète ou convertit les dossiers enregistrés par une version antérieure.
+ * Version 3 : la pré-instruction et les courriers ont disparu ; le verdict de
+ * complétude remplace la recevabilité ; un rapport de contrôle est requis
+ * avant la transmission.
+ */
+function migrerDossiers(etat: unknown): { dossiers: Record<string, EtatDossier> } {
+  type Ancien = Omit<Partial<EtatDossier>, "etape" | "statut" | "conformite"> & {
+    etape?: string;
+    statut?: string;
+    conformite?: Partial<ResultatConformite> & { recevabilite?: string };
+    decision?: unknown;
+    courriers?: unknown;
+  };
+  const VERDICTS: Record<string, Verdict> = { recevable: "conforme", recevable_sous_reserve: "conforme_sous_reserve", non_recevable: "non_conforme" };
+  const s = etat as { dossiers?: Record<string, Ancien> };
+  const dossiers: Record<string, EtatDossier> = {};
+  for (const [id, ancien] of Object.entries(s.dossiers ?? {})) {
+    const { decision: _decision, courriers: _courriers, ...d } = ancien;
+    void _decision;
+    void _courriers;
+    const verdict: Verdict | undefined = d.conformite?.verdict ?? (d.conformite?.recevabilite ? VERDICTS[d.conformite.recevabilite] : undefined);
+    const conformite = d.conformite && verdict ? ({ ...d.conformite, verdict } as ResultatConformite) : undefined;
+    if (conformite) delete (conformite as { recevabilite?: string }).recevabilite;
+
+    const transmis = Boolean(d.export);
+    const statut: StatutDossier = transmis
+      ? verdict === "non_conforme"
+        ? "transmis_incomplet"
+        : "transmis_complet"
+      : d.statut === "recu"
+        ? "recu"
+        : "en_cours";
+    // L'ancienne étape « décision » n'existe plus ; une transmission exige désormais un rapport.
+    const etape: Etape =
+      d.etape === "decision" || (d.etape === "export" && !transmis && !d.rapport) ? "conformite" : ((d.etape as Etape | undefined) ?? "decoupage");
+
+    dossiers[id] = {
+      ...(d as EtatDossier),
+      numeroEnregistrement: d.numeroEnregistrement ?? numeroEnregistrement(),
+      statut,
+      etape,
+      revision: d.revision ?? 0,
+      conformite,
+      journal: d.journal ?? [],
+      export: d.export ? { ...d.export, statut, documents: d.export.documents ?? [] } : undefined,
+      extractions: Object.fromEntries(Object.entries(d.extractions ?? {}).map(([k, e]) => [k, { ...e, confirmations: e.confirmations ?? {} }])),
+    };
+  }
+  return { dossiers };
+}
 
 /** Valeur effective d'un champ : correction de l'agent, sinon valeur extraite. */
 export function valeurEffective(extraction: ExtractionPiece | undefined, chemin: string): string | null {

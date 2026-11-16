@@ -3,7 +3,6 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { DossierGed, LotGedAvecDossiers } from "@/app/api/ged/lots/route";
-import { BandeauModule } from "@/components/bandeau-module";
 import { cheminEtape, libelleEtape } from "@/components/bannette";
 import { Alerte, Badge, Bouton, Carte, Chargement, useMonte } from "@/components/ui";
 import { classerPages, regrouperEnPieces } from "@/lib/decoupage";
@@ -12,8 +11,11 @@ import { useDossierStore } from "@/store/dossier-store";
 
 type EtatImport = { id: string; message: string } | null;
 
-/** Module GED : connexion à la GED simulée, choix du lot et du dossier, prise en charge. */
-export function ModuleGed() {
+/**
+ * Étape 1 · GED : connexion à la GED simulée, choix du lot et du dossier,
+ * prise en charge (enregistrement de la réception et lecture OCR).
+ */
+export function ArriveesGed() {
   const router = useRouter();
   const monte = useMonte();
   const [lots, setLots] = useState<LotGedAvecDossiers[] | null>(null);
@@ -23,7 +25,6 @@ export function ModuleGed() {
 
   const dossiersPoste = useDossierStore((s) => s.dossiers);
   const importerDossier = useDossierStore((s) => s.importerDossier);
-  const supprimerDossier = useDossierStore((s) => s.supprimerDossier);
   const definirOcr = useDossierStore((s) => s.definirOcr);
   const definirDecoupage = useDossierStore((s) => s.definirDecoupage);
 
@@ -45,30 +46,33 @@ export function ModuleGed() {
     };
   }, []);
 
-  async function importer(lot: LotGedAvecDossiers, dossier: DossierGed) {
+  async function prendreEnCharge(lot: LotGedAvecDossiers, dossier: DossierGed) {
+    if (dossiersPoste[dossier.id] && !window.confirm(`Reprendre ${dossier.id} à zéro efface le travail en cours sur ce dossier (déliassage, corrections, rapport). Continuer ?`)) {
+      return;
+    }
     setErreur(null);
-    setImportEnCours({ id: dossier.id, message: "Transfert du document depuis la GED…" });
-    importerDossier({
-      id: dossier.id,
-      lotId: lot.id,
-      libelle: dossier.libelle,
-      dateReception: dossier.dateReception,
-      cheminPdf: dossier.cheminPdf,
-      nbPages: dossier.nbPages,
-    });
+    // La lecture a lieu avant toute écriture : si elle échoue, le dossier
+    // éventuellement en cours sur le poste reste intact.
+    setImportEnCours({ id: dossier.id, message: `Lecture OCR en cours (${dossier.nbPages} pages)…` });
     try {
-      setImportEnCours({ id: dossier.id, message: `OCR Mistral en cours (${dossier.nbPages} pages)…` });
       const reponse = await fetch(`/api/dossiers/${dossier.id}/ocr`, { method: "POST" });
       const data = (await reponse.json()) as { pages: Array<{ index: number; markdown: string }>; modele: string; dureeMs: number } | { error: string };
       if (!reponse.ok || "error" in data) throw new Error("error" in data ? data.error : `Erreur ${reponse.status}`);
-      setImportEnCours({ id: dossier.id, message: "Typage des pages…" });
+      setImportEnCours({ id: dossier.id, message: "Déliassage automatique…" });
       const pagesClassees = classerPages(data.pages);
+      importerDossier({
+        id: dossier.id,
+        lotId: lot.id,
+        libelle: dossier.libelle,
+        dateReception: dossier.dateReception,
+        cheminPdf: dossier.cheminPdf,
+        nbPages: dossier.nbPages,
+      });
       definirOcr(dossier.id, data);
       definirDecoupage(dossier.id, pagesClassees, regrouperEnPieces(pagesClassees));
       router.push(`/dossiers/${dossier.id}/decoupage`);
     } catch (e) {
-      supprimerDossier(dossier.id);
-      setErreur(e instanceof Error ? e.message : "Import impossible");
+      setErreur(e instanceof Error ? e.message : "Prise en charge impossible");
       setImportEnCours(null);
     }
   }
@@ -76,17 +80,8 @@ export function ModuleGed() {
   const lot = lots?.find((l) => l.id === lotId) ?? null;
 
   return (
-    <main className="flex flex-col gap-6">
-      <BandeauModule
-        id="ged"
-        actions={
-          <Bouton variante="secondaire" href="/dossiers">
-            Voir la bannette
-          </Bouton>
-        }
-      />
-
-      {erreur ? <Alerte teinte="danger" titre="Erreur">{erreur}</Alerte> : null}
+    <div className="flex flex-col gap-4">
+      {erreur ? <Alerte teinte="danger" titre="Prise en charge impossible">{erreur}</Alerte> : null}
 
       {!lots ? (
         <Carte>
@@ -103,7 +98,7 @@ export function ModuleGed() {
                     <button
                       type="button"
                       onClick={() => setLotId(l.id)}
-                      className={`w-full rounded-md border px-3 py-2 text-left transition ${actif ? "border-blue-500 bg-blue-50 dark:bg-blue-950" : "border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900"}`}
+                      className={`w-full rounded-md border px-3 py-2 text-left transition ${actif ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:bg-slate-50"}`}
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-medium">{l.libelle}</span>
@@ -130,7 +125,7 @@ export function ModuleGed() {
                   const enPoste = monte ? dossiersPoste[d.id] : undefined;
                   const enImport = importEnCours?.id === d.id;
                   return (
-                    <li key={d.id} className="rounded-md border border-slate-200 p-3 dark:border-slate-800">
+                    <li key={d.id} className="rounded-md border border-slate-200 p-3">
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div>
                           <p className="font-medium">
@@ -146,13 +141,13 @@ export function ModuleGed() {
                             {enPoste.etape !== "termine" ? <Badge>{libelleEtape(enPoste.etape)}</Badge> : null}
                           </span>
                         ) : (
-                          <Badge>À traiter</Badge>
+                          <Badge>À prendre en charge</Badge>
                         )}
                       </div>
 
                       <details className="mt-2 text-sm">
-                        <summary className="cursor-pointer text-slate-600 dark:text-slate-400">Scénario de démonstration : {d.scenario.titre}</summary>
-                        <ul className="mt-1 list-disc pl-5 text-slate-600 dark:text-slate-400">
+                        <summary className="cursor-pointer text-slate-600">Scénario de démonstration : {d.scenario.titre}</summary>
+                        <ul className="mt-1 list-disc pl-5 text-slate-600">
                           {d.scenario.attendu.map((a) => (
                             <li key={a}>{a}</li>
                           ))}
@@ -162,11 +157,16 @@ export function ModuleGed() {
                       <div className="mt-3 flex flex-wrap items-center gap-2">
                         {enPoste && !enImport ? (
                           <Bouton variante="secondaire" href={cheminEtape(d.id, enPoste.etape)}>
-                            Reprendre
+                            {enPoste.etape === "termine" ? "Consulter" : "Reprendre"}
                           </Bouton>
                         ) : null}
-                        <Bouton onClick={() => importer(lot, d)} disabled={importEnCours !== null || !d.tailleKo}>
-                          {enImport ? "Prise en charge en cours…" : enPoste ? "Reprendre à zéro (nouvel OCR)" : "Prendre en charge et lire le dossier"}
+                        <Bouton
+                          variante={enPoste ? "discret" : "primaire"}
+                          onClick={() => prendreEnCharge(lot, d)}
+                          disabled={importEnCours !== null || !d.tailleKo}
+                          className={enPoste ? "px-1" : ""}
+                        >
+                          {enImport ? "Prise en charge en cours…" : enPoste ? "Reprendre à zéro (nouvelle lecture)" : "Prendre en charge et lire le dossier"}
                         </Bouton>
                         {enImport ? <Chargement texte={importEnCours?.message} /> : null}
                       </div>
@@ -178,6 +178,6 @@ export function ModuleGed() {
           </Carte>
         </div>
       )}
-    </main>
+    </div>
   );
 }

@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useState } from "react";
 import { USAGERS_SOLIS, type UsagerSolis } from "@/data/solis";
+import { BoutonOuvrirRapport } from "@/components/rapport-pdf";
 import { Alerte, Badge, Bouton, Carte, Chargement, useMonte } from "@/components/ui";
 import { identiteLue, nomUsager } from "@/lib/dossier-utils";
-import { LIBELLES_ORIENTATION } from "@/lib/regles/decision";
 import { LIBELLES_STATUT, TEINTES_STATUT } from "@/lib/statuts";
 import { useDossierStore, type EtatDossier } from "@/store/dossier-store";
 
@@ -17,6 +17,20 @@ const TEINTE_DEMANDE: Record<string, TeinteStatut> = {
   Refusé: "attention",
   Clos: "neutre",
 };
+
+/** Rapport de contrôle déposé avec la demande, et lien vers le dossier d'origine. */
+function PiecesJointes({ dossier }: { dossier: EtatDossier }) {
+  const depot = dossier.export?.documents.find((x) => x.type === "rapport_controle");
+  const rapport = dossier.rapport?.donnees;
+  return (
+    <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+      {rapport ? <BoutonOuvrirRapport rapport={rapport} libelle={`Rapport de contrôle${depot ? ` ${depot.reference}` : ""} (PDF)`} /> : null}
+      <Link href={`/dossiers/${dossier.id}/export`} className="text-xs font-medium text-blue-700 hover:underline">
+        Dossier d&apos;origine
+      </Link>
+    </span>
+  );
+}
 
 function FicheUsager({ usager, dossiersLocaux }: { usager: UsagerSolis; dossiersLocaux: EtatDossier[] }) {
   const rattaches = dossiersLocaux.filter((d) => d.export?.numeroUsager === usager.numeroUsager);
@@ -65,10 +79,8 @@ function FicheUsager({ usager, dossiersLocaux }: { usager: UsagerSolis; dossiers
                 <td className="py-1.5 pr-3 font-mono text-xs">{d.export?.numeroDossier}</td>
                 <td className="py-1.5 pr-3">
                   Demande d&apos;aides à l&apos;autonomie (CERFA 16301*01)
-                  <span className="block text-xs text-slate-500">
-                    Enregistrée depuis ce poste · dossier {d.id} ·{" "}
-                    {d.decision?.orientationRetenue ? LIBELLES_ORIENTATION[d.decision.orientationRetenue] : "orientation non retenue"}
-                  </span>
+                  <span className="block text-xs text-slate-500">Enregistrée depuis Solid&apos;IA · dossier {d.id} · à instruire</span>
+                  <PiecesJointes dossier={d} />
                 </td>
                 <td className="py-1.5 pr-3">{d.dateReception}</td>
                 <td className="py-1.5">
@@ -129,8 +141,9 @@ export function VueSolis() {
       </div>
 
       <Alerte teinte="info">
-        Cette vue simule le logiciel métier de l&apos;action sociale. Les usagers listés sont fictifs et servent au rapprochement d&apos;identité à
-        l&apos;étape de contrôle des données. Les lignes bleues sont les demandes que vous avez enregistrées depuis ce poste.
+        Cette vue simule le logiciel métier de l&apos;action sociale, destination des dossiers contrôlés. Les usagers listés sont fictifs et
+        servent au rapprochement d&apos;identité à l&apos;étape de contrôle des données. Les lignes bleues sont les demandes enregistrées depuis
+        ce poste, chacune avec son rapport de contrôle ; leur instruction, et donc l&apos;appréciation du droit, se fait dans Solis.
       </Alerte>
 
       <Carte
@@ -176,9 +189,7 @@ export function VueSolis() {
                     né(e) le {identite.dateNaissance ?? "—"} · NIR <span className="font-mono">{identite.nir ?? "—"}</span> · demande{" "}
                     {d.export?.numeroDossier}
                   </p>
-                  <Link href={`/dossiers/${d.id}/export`} className="text-sm font-medium text-blue-700 hover:underline">
-                    Voir le dossier d&apos;origine
-                  </Link>
+                  <PiecesJointes dossier={d} />
                 </li>
               );
             })}
@@ -192,10 +203,7 @@ export function VueSolis() {
             Les demandes apparaissent ici une fois la dernière étape du traitement franchie.
           </p>
           <div className="mt-3 flex gap-2">
-            <Bouton href="/dossiers">Ouvrir la bannette</Bouton>
-            <Bouton variante="secondaire" href="/ged">
-              Prendre un dossier
-            </Bouton>
+            <Bouton href="/dossiers">Traitement des dossiers</Bouton>
           </div>
         </Carte>
       ) : null}

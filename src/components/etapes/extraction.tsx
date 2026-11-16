@@ -118,13 +118,13 @@ export function EtapeExtraction({ id }: { id: string }) {
   return (
     <main className="flex flex-col gap-6">
       <Titre
-        surtitre="Étape 2"
+        surtitre="Étape 3"
         titre="Contrôle des données"
-        description="Les champs de chaque pièce sont extraits du texte OCR avec un score de confiance et affichés en regard du document. Les champs critiques, qui commandent la recevabilité et l'orientation, doivent être vérifiés un à un ; les autres se corrigent au besoin. L'identité lue est ensuite rapprochée des usagers connus."
+        description="Les champs de chaque pièce sont extraits du texte OCR avec un score de confiance et affichés en regard du document. Les champs critiques, qui commandent la complétude ou sont repris par l'instruction, doivent être vérifiés un à un ; les autres se corrigent au besoin. L'identité lue est ensuite rapprochée des usagers connus de Solis."
         actions={
           <div className="flex flex-col items-end gap-1">
             <Bouton onClick={valider} disabled={!pretAValider}>
-              Valider et passer à la recevabilité
+              Valider et passer à la complétude
             </Bouton>
             {!pretAValider && manque.length ? <p className="text-xs text-slate-500">Reste : {manque.join(", ")}.</p> : null}
           </div>

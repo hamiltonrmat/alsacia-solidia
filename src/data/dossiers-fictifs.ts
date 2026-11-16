@@ -206,11 +206,11 @@ export const DOSSIERS_FICTIFS: DossierFictif[] = [
     scenario: {
       titre: "Dossier complet et conforme, usager déjà connu",
       attendu: [
-        "Découpage : CERFA (5 pages), certificat médical (3 pages), CNI, RIB, avis d'imposition.",
-        "Conformité : toutes les pièces obligatoires présentes et cohérentes entre elles.",
-        "Décision : 78 ans, 3 réponses « non » au questionnaire → APA relevant du département, instruction.",
+        "Déliassage : CERFA (5 pages), certificat médical (3 pages), CNI, RIB, avis d'imposition.",
+        "Complétude : toutes les pièces obligatoires présentes et cohérentes entre elles → dossier complet, date de complétude fixée.",
         "Rapprochement : usager connu de Solis par son NIR (APA 2019) ; un homonyme Jean-Pierre DUPONT apparaît et ne doit pas être confondu.",
-        "Enregistrement : la nouvelle demande est rattachée à l'usager existant.",
+        "Rapport de contrôle : indice de robustesse de la lecture élevé, aucun point bloquant.",
+        "Transmission : la nouvelle demande est rattachée à l'usager existant, avec son rapport.",
       ],
     },
   },
@@ -309,9 +309,10 @@ export const DOSSIERS_FICTIFS: DossierFictif[] = [
     scenario: {
       titre: "RIB manquant, demande d'une personne mariée",
       attendu: [
-        "Conformité : RIB absent → dossier non recevable, courrier de demande de pièce.",
+        "Complétude : RIB absent → dossier incomplet, pièce manquante listée dans le rapport.",
+        "Transmission : le dossier part quand même dans Solis, au statut « incomplet », sans date de dossier complet.",
         "Certificat médical absent : facultatif, simple information.",
-        "Ressources du conjoint à prendre en compte (avis d'imposition commun, 2 parts).",
+        "Avis d'imposition commun (2 parts) : les ressources du conjoint y figurent.",
       ],
     },
   },
@@ -449,8 +450,9 @@ export const DOSSIERS_FICTIFS: DossierFictif[] = [
     scenario: {
       titre: "Demandeur de 58 ans, PCH déjà perçue",
       attendu: [
-        "Décision : condition d'âge (60 ans) non remplie → orientation vers la MDPH (PCH).",
-        "Information : PCH déjà perçue, non cumulable avec l'APA.",
+        "Aucune appréciation du droit dans l'outil : l'âge et la PCH déclarée ne bloquent rien.",
+        "Complétude : dossier complet, transmis à Solis ; c'est l'instruction qui constatera que la condition d'âge n'est pas remplie.",
+        "Données transmises telles quelles : date de naissance, PCH perçue (partie 5 du formulaire).",
       ],
     },
   },
@@ -545,10 +547,11 @@ export const DOSSIERS_FICTIFS: DossierFictif[] = [
       { type: "avis_imposition" },
     ],
     scenario: {
-      titre: "Dossier scanné avec la notice, orientation caisse de retraite",
+      titre: "Dossier scanné avec la notice et un certificat vierge",
       attendu: [
-        "Découpage : pages de notice (1 à 4), mentions RGPD (10) et certificat médical vierge (11 à 13) détectés et écartés.",
-        "Décision : 4 réponses « oui » au questionnaire → organisme compétent = caisse de retraite (Fonction publique d'État), pas l'APA.",
+        "Déliassage : pages de notice (1 à 4), mentions RGPD (10) détectées et écartées ; le rapport en garde la trace page par page.",
+        "Complétude : certificat médical (11 à 13) joint mais vierge, considéré comme absent (pièce facultative).",
+        "Questionnaire : 4 réponses « oui », transmises telles quelles ; l'orientation vers la caisse de retraite relève de l'instruction dans Solis.",
       ],
     },
   },
@@ -702,12 +705,12 @@ export const DOSSIERS_FICTIFS: DossierFictif[] = [
     scenario: {
       titre: "Usager sous tutelle, jugement non joint, pièces dans le désordre",
       attendu: [
-        "Découpage : la CNI arrive en première page, le certificat médical en dernier.",
+        "Déliassage : la CNI arrive en première page, le certificat médical en dernier.",
         "Signature par le représentant légal (tutrice), mesure de tutelle déclarée.",
-        "Conformité : décision de justice de mise sous protection absente → pièce à réclamer.",
+        "Complétude : décision de justice de mise sous protection absente → bloquant, dossier incomplet.",
         "Résidence principale non louée → avis de taxe foncière attendu, à vérifier.",
         "Rapprochement : une demande APA est déjà en cours dans Solis, déposée par l'organisme tutélaire → rattacher, ne pas créer de doublon.",
-        "Pré-instruction : 86 ans, 4 « non » → relève du département ; mise en attente de pièces.",
+        "Transmission : l'envoi complète la demande en cours, au statut « incomplet », avec son rapport.",
       ],
     },
   },
@@ -868,7 +871,7 @@ export const DOSSIERS_FICTIFS: DossierFictif[] = [
       attendu: [
         "Conformité : CNI expirée (2020, prolongation de 5 ans jusqu'en 2025) → alerte.",
         "Conformité : date de naissance du CERFA (17/08/1946) différente de la CNI et du certificat médical (17/03/1946) → à vérifier par l'agent.",
-        "Décision : arrivée à l'adresse actuelle depuis moins de 3 mois, ancien domicile en Moselle → département financeur à déterminer.",
+        "Déménagement récent depuis la Moselle : ancienne adresse et date d'arrivée transmises à Solis, où se détermine le département financeur.",
       ],
     },
   },

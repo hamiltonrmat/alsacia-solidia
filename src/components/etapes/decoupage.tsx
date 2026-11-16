@@ -51,7 +51,7 @@ export function EtapeDecoupage({ id }: { id: string }) {
 
   function recalculer() {
     if (!dossier?.ocr) return;
-    appliquer(classerPages(dossier.ocr.pages), "Typage automatique relancé");
+    appliquer(classerPages(dossier.ocr.pages), "Déliassage automatique relancé");
   }
 
   function valider() {
@@ -62,15 +62,15 @@ export function EtapeDecoupage({ id }: { id: string }) {
   return (
     <main className="flex flex-col gap-6">
       <Titre
-        surtitre="Étape 1"
-        titre="Typage des pièces"
-        description={`Le document de ${dossier.nbPages} pages a été lu par ${dossier.ocr.modele} en ${(dossier.ocr.dureeMs / 1000).toFixed(1)} s. Chaque page a été reconnue d'après son contenu et rattachée à une pièce ; corrigez le type d'une pièce ou d'une page si nécessaire, puis validez.`}
+        surtitre="Étape 2"
+        titre="Déliassage"
+        description={`Le document de ${dossier.nbPages} pages a été lu par ${dossier.ocr.modele} en ${(dossier.ocr.dureeMs / 1000).toFixed(1)} s. Chaque page a été reconnue d'après son contenu et rattachée à une pièce ; les pages inutiles (notice, mentions RGPD, pages vides) sont écartées. Corrigez le type d'une pièce ou d'une page si nécessaire, puis validez.`}
         actions={
           <>
             <Bouton variante="secondaire" onClick={recalculer}>
               Recalculer automatiquement
             </Bouton>
-            <Bouton onClick={valider}>Valider le typage et extraire</Bouton>
+            <Bouton onClick={valider}>Valider le déliassage et extraire</Bouton>
           </>
         }
       />

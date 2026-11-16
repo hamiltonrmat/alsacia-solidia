@@ -1,12 +1,13 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { CarteRapport } from "@/components/rapport-pdf";
 import { Alerte, Badge, Bouton, Carte, Titre, useMonte } from "@/components/ui";
 import { LIBELLES_PIECES, TYPES_A_ECARTER } from "@/lib/decoupage";
 import { lecteurDepuisDossier, metadonneesExport, nomUsager, usagerRattache } from "@/lib/dossier-utils";
-import { destinataireOrientation, LIBELLES_ORIENTATION, statutPourOrientation } from "@/lib/regles/decision";
-import { LIBELLES_STATUT, TEINTES_STATUT } from "@/lib/statuts";
-import { useDossierStore, type DocumentRetourGed } from "@/store/dossier-store";
+import { LIBELLES_STATUT, TEINTES_STATUT, type StatutDossier } from "@/lib/statuts";
+import { useDossierStore, type DocumentRetourGed, type DocumentSolis } from "@/store/dossier-store";
 
 function slug(texte: string): string {
   return texte
@@ -17,23 +18,37 @@ function slug(texte: string): string {
     .replace(/(^-|-$)/g, "");
 }
 
+const LIBELLES_ACTION = {
+  cree: "Usager créé et demande enregistrée",
+  rattache: "Demande enregistrée et rattachée à l'usager existant",
+  mis_a_jour: "Envoi rattaché à la demande déjà en cours",
+};
+
 export function EtapeExport({ id }: { id: string }) {
+  const router = useRouter();
   const monte = useMonte();
   const dossier = useDossierStore((s) => s.dossiers[id]);
   const definirExport = useDossierStore((s) => s.definirExport);
+  const revenirA = useDossierStore((s) => s.revenirA);
   const [erreur, setErreur] = useState<string | null>(null);
   const [enCours, setEnCours] = useState(false);
   const [voirMetadonnees, setVoirMetadonnees] = useState(false);
-  const [courrierOuvert, setCourrierOuvert] = useState<string | null>(null);
 
   if (!monte || !dossier) return null;
-  if (!dossier.decision?.valideLe && !dossier.export) {
-    return <Alerte teinte="attention">L&apos;orientation n&apos;a pas été validée. Revenez à l&apos;étape précédente.</Alerte>;
+  if (!dossier.rapport && !dossier.export) {
+    return (
+      <Alerte teinte="attention" titre="Le rapport de contrôle n'a pas été généré">
+        La transmission vers Solis part avec le rapport de contrôle, généré à la validation de l&apos;étape « Complétude et conformité ».
+        <div className="mt-2">
+          <Bouton href={`/dossiers/${id}/conformite`}>Aller à la complétude et conformité</Bouton>
+        </div>
+      </Alerte>
+    );
   }
 
-  const orientation = dossier.decision?.orientationRetenue ?? dossier.decision?.resultat.orientation ?? "indeterminee";
-  const statut = dossier.export?.statut ?? statutPourOrientation(orientation);
-  const caisse = lecteurDepuisDossier(dossier)("cerfa_formulaire", "caisse_retraite");
+  const rapport = dossier.rapport?.donnees;
+  const rapportPerime = !dossier.export && dossier.rapport !== undefined && dossier.rapport.revision !== dossier.revision;
+  const statut: StatutDossier = dossier.export?.statut ?? rapport?.dossier.statutTransmission ?? "transmis_incomplet";
   const rattache = usagerRattache(dossier);
   const nouveau = dossier.rapprochement?.decision?.type === "nouveau";
   const metadonnees = metadonneesExport(dossier);
@@ -41,9 +56,11 @@ export function EtapeExport({ id }: { id: string }) {
   const documents: DocumentRetourGed[] = (dossier.pieces ?? [])
     .filter((p) => !TYPES_A_ECARTER.includes(p.type))
     .map((p) => ({ pieceId: p.id, type: p.type, pages: p.pages }));
+  const documentRapport = dossier.export?.documents.find((d) => d.type === "rapport_controle");
+  const empreinteConforme = documentRapport && dossier.rapport?.empreinte ? documentRapport.empreinte === dossier.rapport.empreinte : null;
 
   async function enregistrer() {
-    if (!dossier) return;
+    if (!dossier || !rapport) return;
     setEnCours(true);
     setErreur(null);
     try {
@@ -57,10 +74,11 @@ export function EtapeExport({ id }: { id: string }) {
           numeroUsagerExistant: rattache?.usager.numeroUsager ?? null,
           numeroDemandeExistante: rattache?.demandeEnCours?.numero ?? null,
           metadonnees,
+          rapport,
         }),
       });
       const data = (await reponse.json()) as
-        | { action: "cree" | "rattache" | "mis_a_jour"; numeroUsager: string; numeroDossier: string; statut: typeof statut; horodatage: string }
+        | { action: "cree" | "rattache" | "mis_a_jour"; numeroUsager: string; numeroDossier: string; statut: StatutDossier; horodatage: string; documents: DocumentSolis[] }
         | { error: string };
       if (!reponse.ok || "error" in data) throw new Error("error" in data ? data.error : `Erreur ${reponse.status}`);
       definirExport(dossier.id, { ...data, metadonnees, retourGed: documents });
@@ -71,25 +89,27 @@ export function EtapeExport({ id }: { id: string }) {
     }
   }
 
-  const LIBELLES_ACTION = {
-    cree: "Usager créé et demande enregistrée",
-    rattache: "Demande enregistrée et rattachée à l'usager existant",
-    mis_a_jour: "Envoi rattaché à la demande déjà en cours",
-  };
+  function retourCompletude() {
+    revenirA(id, "conformite");
+    router.push(`/dossiers/${id}/conformite`);
+  }
 
   return (
     <main className="flex flex-col gap-6">
       <Titre
         surtitre="Étape 5"
         titre="Enregistrement et transmission"
-        description="La demande est enregistrée dans le logiciel métier avec son statut, rattachée à l'usager confirmé ou à un usager créé, puis transmise au destinataire de l'orientation. Les pièces typées sont déposées dans la GED sous l'usager, avec le numéro de demande en retour d'index."
+        description="La demande est enregistrée dans Solis, rattachée à l'usager confirmé ou à un usager créé, avec le rapport de contrôle et ses données structurées. Les pièces typées sont déposées dans la GED sous l'usager. L'appréciation du droit à la prestation appartient ensuite à l'instruction dans Solis."
         actions={
           dossier.export ? (
-            <Bouton variante="secondaire" href="/ged">
-              Retour à la GED
-            </Bouton>
+            <>
+              <Bouton variante="secondaire" href="/dossiers">
+                Retour au traitement des dossiers
+              </Bouton>
+              <Bouton href="/solis">Voir la demande dans Solis</Bouton>
+            </>
           ) : (
-            <Bouton onClick={enregistrer} disabled={enCours || !dossier.rapprochement?.decision}>
+            <Bouton onClick={enregistrer} disabled={enCours || rapportPerime || !dossier.rapprochement?.decision}>
               {enCours ? "Enregistrement en cours…" : "Enregistrer dans Solis et transmettre"}
             </Bouton>
           )
@@ -98,13 +118,27 @@ export function EtapeExport({ id }: { id: string }) {
 
       {erreur ? <Alerte teinte="danger" titre="Erreur">{erreur}</Alerte> : null}
 
+      {rapportPerime ? (
+        <Alerte teinte="danger" titre="Le rapport de contrôle n'est plus à jour">
+          Le dossier a été modifié depuis la génération du rapport : la transmission est bloquée tant que le rapport n&apos;est pas régénéré.
+          <div className="mt-2">
+            <Bouton onClick={retourCompletude}>Revenir à la complétude et conformité</Bouton>
+          </div>
+        </Alerte>
+      ) : null}
+
       {dossier.export ? (
         <Alerte teinte="succes" titre={LIBELLES_ACTION[dossier.export.action]}>
           <p>
             Usager <strong>{dossier.export.numeroUsager}</strong> · Demande <strong>{dossier.export.numeroDossier}</strong> · statut{" "}
             <strong>{LIBELLES_STATUT[dossier.export.statut]}</strong> · le {new Date(dossier.export.horodatage).toLocaleString("fr-FR")}
           </p>
-          <p className="mt-1">Transmis à : {destinataireOrientation(orientation, caisse)}.</p>
+          {documentRapport ? (
+            <p className="mt-1">
+              Rapport de contrôle déposé sous la référence <strong className="font-mono">{documentRapport.reference}</strong> ({documentRapport.nbPages} pages)
+              {empreinteConforme === true ? " : empreinte identique au rapport généré, document intègre." : empreinteConforme === false ? " : l'empreinte diffère du rapport généré, à vérifier." : "."}
+            </p>
+          ) : null}
         </Alerte>
       ) : null}
 
@@ -149,18 +183,16 @@ export function EtapeExport({ id }: { id: string }) {
             <dd className="font-mono">{dossier.numeroEnregistrement}</dd>
             <dt className="text-slate-500">Réception</dt>
             <dd>{dossier.dateReception}</dd>
-            <dt className="text-slate-500">Complétude</dt>
-            <dd>{dossier.dateCompletude ?? "en attente de pièces"}</dd>
-            <dt className="text-slate-500">Recevabilité</dt>
-            <dd>{dossier.conformite?.recevabilite ?? "—"}</dd>
-            <dt className="text-slate-500">Orientation</dt>
-            <dd>{LIBELLES_ORIENTATION[orientation]}</dd>
+            <dt className="text-slate-500">Dossier complet</dt>
+            <dd>{dossier.dateCompletude ?? "non, pièces manquantes ou point bloquant"}</dd>
+            <dt className="text-slate-500">Contrôle</dt>
+            <dd>{rapport?.synthese.libelleVerdict ?? "—"}</dd>
             <dt className="text-slate-500">Statut</dt>
             <dd>
               <Badge teinte={TEINTES_STATUT[statut]}>{LIBELLES_STATUT[statut]}</Badge>
             </dd>
             <dt className="text-slate-500">Destinataire</dt>
-            <dd>{destinataireOrientation(orientation, caisse)}</dd>
+            <dd>Solis, service instructeur des aides à l&apos;autonomie</dd>
           </dl>
           <div className="mt-3">
             <Bouton variante="secondaire" onClick={() => setVoirMetadonnees((v) => !v)}>
@@ -171,54 +203,33 @@ export function EtapeExport({ id }: { id: string }) {
             ) : null}
           </div>
         </Carte>
-
-        <Carte titre="Courriers" sousTitre={`${dossier.courriers.length} courrier(s) généré(s)`}>
-          {dossier.courriers.length === 0 ? (
-            <p className="text-sm text-slate-500">Aucun courrier généré.</p>
-          ) : (
-            <ul className="flex flex-col gap-2 text-sm">
-              {dossier.courriers.map((c) => (
-                <li key={c.type} className="rounded-md border border-slate-200 p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-medium">{c.libelle}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-500">{new Date(c.genereLe).toLocaleString("fr-FR")}</span>
-                      <Bouton variante="discret" className="px-0 py-0 text-xs" onClick={() => setCourrierOuvert(courrierOuvert === c.type ? null : c.type)}>
-                        {courrierOuvert === c.type ? "Masquer" : "Afficher"}
-                      </Bouton>
-                    </div>
-                  </div>
-                  {courrierOuvert === c.type ? <textarea readOnly value={c.texte} rows={14} className="mt-2 w-full rounded-md border border-slate-300 bg-white p-2 font-mono text-xs" /> : null}
-                </li>
-              ))}
-            </ul>
-          )}
-        </Carte>
-
-        <Carte titre="Retour vers la GED" sousTitre={dossier.export ? `Pièces déposées sous l'usager ${dossier.export.numeroUsager}` : "Pièces qui seront déposées sous l'usager"}>
-          <ul className="flex flex-col gap-2 text-sm">
-            {documents.map((d) => (
-              <li key={d.pieceId} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 px-3 py-2">
-                <span>
-                  {LIBELLES_PIECES[d.type]} <span className="text-xs text-slate-500">p. {d.pages.join(", ")}</span>
-                </span>
-                <a
-                  href={`/api/dossiers/${dossier.id}/pieces?pages=${d.pages.join(",")}&nom=${slug(LIBELLES_PIECES[d.type])}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-xs font-medium text-blue-700 hover:underline"
-                >
-                  Ouvrir le PDF de la pièce
-                </a>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-3 text-xs text-slate-500">
-            Chaque pièce est indexée dans la GED avec le numéro d&apos;enregistrement{dossier.export ? `, le numéro de demande ${dossier.export.numeroDossier}` : ""} et son type,
-            sous l&apos;usager, de sorte qu&apos;elle soit retrouvable depuis sa fiche.
-          </p>
-        </Carte>
       </div>
+
+      <CarteRapport dossier={dossier} apercuOuvert={false} />
+
+      <Carte titre="Retour vers la GED" sousTitre={dossier.export ? `Pièces déposées sous l'usager ${dossier.export.numeroUsager}` : "Pièces qui seront déposées sous l'usager"}>
+        <ul className="grid gap-2 text-sm md:grid-cols-2">
+          {documents.map((d) => (
+            <li key={d.pieceId} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 px-3 py-2">
+              <span>
+                {LIBELLES_PIECES[d.type]} <span className="text-xs text-slate-500">p. {d.pages.join(", ")}</span>
+              </span>
+              <a
+                href={`/api/dossiers/${dossier.id}/pieces?pages=${d.pages.join(",")}&nom=${slug(LIBELLES_PIECES[d.type])}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-medium text-blue-700 hover:underline"
+              >
+                Ouvrir le PDF de la pièce
+              </a>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-3 text-xs text-slate-500">
+          Chaque pièce est indexée dans la GED avec le numéro d&apos;enregistrement{dossier.export ? `, le numéro de demande ${dossier.export.numeroDossier}` : ""} et son type,
+          sous l&apos;usager, de sorte qu&apos;elle soit retrouvable depuis sa fiche.
+        </p>
+      </Carte>
     </main>
   );
 }

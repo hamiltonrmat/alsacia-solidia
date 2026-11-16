@@ -542,8 +542,9 @@ export function optionsChamp(type: TypePiece, chemin: string): string[] | null {
 }
 
 /**
- * Champs critiques : ils commandent la recevabilité ou l'orientation et
- * doivent être vérifiés explicitement par l'agent, même lus avec une bonne
+ * Champs critiques : ils commandent la complétude et la conformité, ou sont
+ * repris tels quels par l'instruction dans Solis (questionnaire d'autonomie),
+ * et doivent être vérifiés explicitement par l'agent, même lus avec une bonne
  * confiance (pratique du vidéocodage).
  */
 export const CHAMPS_CRITIQUES: Partial<Record<TypePiece, string[]>> = {
@@ -571,7 +572,7 @@ export function estChampCritique(type: TypePiece, chemin: string): boolean {
   return CHAMPS_CRITIQUES[type]?.includes(chemin) ?? false;
 }
 
-/** Page officielle du CERFA (5 à 9) où se trouve chaque groupe de champs. */
+/** Page officielle du CERFA (5 à 9) où se trouve chaque groupe de champs du formulaire. */
 const PAGE_CERFA_PAR_GROUPE: Record<string, number> = {
   demandeur: 5,
   caisse_retraite: 5,
@@ -592,6 +593,48 @@ const PAGE_CERFA_PAR_GROUPE: Record<string, number> = {
   signature: 9,
 };
 
-export function pageCerfaPourChemin(chemin: string): number {
+/** Champs du certificat médical portés par les pages 12 et 13 ; tous les autres sont en page 11. */
+const CERTIFICAT_PAGE_12 = new Set([
+  "prises_en_charge",
+  "perspective",
+  "perimetre_marche",
+  "station_debout_penible",
+  "prothese_membres_inferieurs",
+  "oxygenotherapie",
+  "aide_humaine",
+  "canne",
+  "deambulateur",
+  "fauteuil_roulant",
+  "autre_aide_technique",
+  "evaluation.transferts",
+  "evaluation.deplacement_interieur",
+  "evaluation.deplacement_exterieur",
+  "evaluation.prehension",
+  "evaluation.motricite_fine",
+]);
+const CERTIFICAT_PAGE_13 = new Set([
+  "evaluation.toilette",
+  "evaluation.habillage",
+  "evaluation.alimentation",
+  "evaluation.elimination_urinaire",
+  "evaluation.elimination_fecale",
+  "evaluation.orientation_temps",
+  "evaluation.orientation_espace",
+  "evaluation.securite",
+  "evaluation.comportement",
+  "coherence_reponses",
+  "score_mms",
+  "lieu",
+  "date",
+  "medecin_nom",
+  "medecin_rpps",
+]);
+
+/**
+ * Page officielle du CERFA où se trouve un champ : 5 à 9 pour le formulaire,
+ * 11 à 13 pour le certificat médical.
+ */
+export function pageCerfaPourChemin(chemin: string, type: TypePiece = "cerfa_formulaire"): number {
+  if (type === "certificat_medical") return CERTIFICAT_PAGE_13.has(chemin) ? 13 : CERTIFICAT_PAGE_12.has(chemin) ? 12 : 11;
   return PAGE_CERFA_PAR_GROUPE[chemin.split(".")[0]] ?? 5;
 }

@@ -1,11 +1,13 @@
 /**
- * Les cinq étapes de pré-instruction d'un dossier, avec leur résumé.
+ * Les cinq étapes du traitement d'un dossier, de la GED à Solis.
  *
  * Défini hors du magasin d'état (qui est un module client) pour être
- * utilisable aussi dans les pages serveur.
+ * utilisable aussi dans les pages serveur. La première étape, la GED, se
+ * déroule sur la page « Traitement des dossiers » ; les quatre suivantes ont
+ * chacune leur page sous /dossiers/<id>/.
  */
 
-export type IdEtape = "decoupage" | "extraction" | "conformite" | "decision" | "export";
+export type IdEtape = "ged" | "decoupage" | "extraction" | "conformite" | "export";
 
 export type DescriptionEtape = {
   id: IdEtape;
@@ -16,33 +18,33 @@ export type DescriptionEtape = {
 
 export const ETAPES: DescriptionEtape[] = [
   {
-    id: "decoupage",
+    id: "ged",
     numero: 1,
-    libelle: "Typage des pièces",
-    resume: "Reconnaître chaque page et la rattacher à la bonne pièce.",
+    libelle: "GED",
+    resume: "Prendre en charge un dossier numérisé : enregistrement de la réception et lecture OCR.",
+  },
+  {
+    id: "decoupage",
+    numero: 2,
+    libelle: "Déliassage",
+    resume: "Reconnaître chaque page, la rattacher à la bonne pièce et écarter les pages inutiles.",
   },
   {
     id: "extraction",
-    numero: 2,
+    numero: 3,
     libelle: "Contrôle des données",
-    resume: "Vérifier les champs extraits en regard du document et rapprocher l'usager.",
+    resume: "Vérifier les champs extraits en regard du document et rapprocher l'usager de Solis.",
   },
   {
     id: "conformite",
-    numero: 3,
-    libelle: "Complétude et recevabilité",
-    resume: "Contrôler les pièces, fixer la date de dossier complet, écrire à l'usager.",
-  },
-  {
-    id: "decision",
     numero: 4,
-    libelle: "Pré-instruction",
-    resume: "Appliquer les règles et retenir l'orientation du dossier.",
+    libelle: "Complétude et conformité",
+    resume: "Appliquer les règles métier, fixer la date de dossier complet et générer le rapport de contrôle.",
   },
   {
     id: "export",
     numero: 5,
     libelle: "Enregistrement et transmission",
-    resume: "Enregistrer dans Solis, transmettre et reverser les pièces dans la GED.",
+    resume: "Enregistrer la demande dans Solis avec le rapport de contrôle et les pièces.",
   },
 ];

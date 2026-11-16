@@ -1,6 +1,7 @@
 import type { CandidatSolis } from "@/data/solis";
 import type { Piece, TypePiece } from "@/lib/decoupage";
 import { pageCerfaPourChemin } from "@/lib/extraction/schemas";
+import { MARQUE } from "@/lib/marque";
 import type { EntreeConformite, Lecteur } from "@/lib/regles/conformite";
 import { extractionParType, valeurEffective, type EtatDossier } from "@/store/dossier-store";
 
@@ -51,12 +52,19 @@ export function pagesCerfaPresentes(dossier: EtatDossier): number[] {
     .map((p) => p.pageCerfa as number);
 }
 
-/** Page du dossier à afficher pour vérifier un champ d'une pièce. */
+/**
+ * Page du dossier à afficher pour vérifier un champ d'une pièce. Pour le
+ * formulaire et le certificat médical, la page est retrouvée par son numéro
+ * officiel de CERFA ; pour les autres pièces, c'est leur première page.
+ */
 export function pagePourChamp(dossier: EtatDossier, piece: Piece, chemin: string): number {
-  if (piece.type !== "cerfa_formulaire") return piece.pages[0];
-  const cible = pageCerfaPourChemin(chemin);
+  if (piece.type !== "cerfa_formulaire" && piece.type !== "certificat_medical") return piece.pages[0];
+  const cible = pageCerfaPourChemin(chemin, piece.type);
   const page = piece.pages.find((n) => dossier.pagesClassees?.[n - 1]?.pageCerfa === cible);
-  return page ?? piece.pages[0];
+  if (page !== undefined) return page;
+  // Pages sans numéro officiel lu : position relative dans la pièce (5 → 1re page, 11 → 1re page…).
+  const rang = cible - (piece.type === "cerfa_formulaire" ? 5 : 11);
+  return piece.pages[rang] ?? piece.pages[0];
 }
 
 /** Candidat Solis retenu par l'agent, s'il a rattaché un usager existant. */
@@ -75,16 +83,21 @@ export function rapprochementPourConformite(dossier: EtatDossier): EntreeConform
   return { confirme: true, usager: candidat?.usager ?? null, demandeEnCours: candidat?.demandeEnCours ?? null };
 }
 
-/** Métadonnées transmises au logiciel métier lors de l'enregistrement. */
+/**
+ * Métadonnées transmises au logiciel métier lors de l'enregistrement : les
+ * données du formulaire telles que contrôlées par l'agent, sans aucune
+ * appréciation du droit, qui relève de l'instruction dans Solis.
+ */
 export function metadonneesExport(dossier: EtatDossier): Record<string, unknown> {
   const lire = lecteurDepuisDossier(dossier);
   const c = (chemin: string) => lire("cerfa_formulaire", chemin);
   const rattache = usagerRattache(dossier);
+  const rapport = dossier.rapport?.donnees;
   return {
     source: {
       ged: { lot: dossier.lotId, dossier: dossier.id, pages: dossier.nbPages, dateReception: dossier.dateReception },
       numeroEnregistrement: dossier.numeroEnregistrement,
-      outil: "Solid'IA v2",
+      outil: `${MARQUE.nom} ${MARQUE.version}`,
       importeLe: dossier.importeLe,
     },
     usager: {
@@ -124,6 +137,18 @@ export function metadonneesExport(dossier: EtatDossier): Record<string, unknown>
         faireSaToilette: c("questionnaire.faire_sa_toilette"),
         manger: c("questionnaire.manger"),
       },
+      prestationsDeclarees: {
+        actp: c("prestations.actp"),
+        aideSocialeDepartementale: c("prestations.aide_sociale_departementale"),
+        mtp: c("prestations.mtp"),
+        pch: c("prestations.pch"),
+        pcrtp: c("prestations.pcrtp"),
+      },
+      ancienneResidence: {
+        codePostal: c("ancienne_residence.code_postal"),
+        commune: c("ancienne_residence.commune"),
+        dateArrivee: c("ancienne_residence.date_arrivee"),
+      },
       demandeCmi: {
         stationnement: c("cmi.stationnement"),
         prioriteOuInvalidite: c("cmi.priorite_ou_invalidite"),
@@ -137,18 +162,17 @@ export function metadonneesExport(dossier: EtatDossier): Record<string, unknown>
       pages: p.pages,
       extraite: Boolean(dossier.extractions[p.id]?.champs),
     })),
-    preInstruction: {
-      statut: dossier.statut,
-      recevabilite: dossier.conformite?.recevabilite ?? null,
-      piecesManquantes: dossier.conformite?.piecesManquantes ?? [],
-      pointsAttention: (dossier.conformite?.controles ?? []).filter((x) => x.statut === "alerte" || x.statut === "bloquant").map((x) => x.libelle),
-      orientationRecommandee: dossier.decision?.resultat.orientation ?? null,
-      orientationRetenue: dossier.decision?.orientationRetenue ?? null,
-      commentaireAgent: dossier.decision?.commentaire ?? null,
-      courriers: dossier.courriers.map((x) => ({ type: x.type, genereLe: x.genereLe })),
-      decideLe: dossier.decision?.valideLe ?? null,
+    controle: {
+      verdict: rapport?.synthese.verdict ?? dossier.conformite?.verdict ?? null,
+      dateCompletude: dossier.dateCompletude ?? null,
+      piecesManquantes: rapport?.synthese.piecesManquantes ?? dossier.conformite?.piecesManquantes ?? [],
+      pointsAttention: (dossier.conformite?.controles ?? []).filter((x) => x.statut === "alerte" || x.statut === "bloquant").map((x) => ({ regle: x.id, statut: x.statut, libelle: x.libelle })),
+      observationsAgent: dossier.observations?.trim() || null,
+      indiceRobustesseOcr: rapport?.ocr.global.indice ?? null,
       champsCorriges: Object.values(dossier.extractions).reduce((n, e) => n + Object.keys(e.corrections).length, 0),
       champsVerifies: Object.values(dossier.extractions).reduce((n, e) => n + Object.keys(e.confirmations).length, 0),
+      valideLe: dossier.conformiteValideeLe ?? null,
+      rapport: rapport ? { schema: rapport.schema, version: rapport.version, genereLe: rapport.genereLe, empreinte: dossier.rapport?.empreinte ?? null } : null,
     },
   };
 }

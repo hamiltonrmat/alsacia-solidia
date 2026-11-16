@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Link from "next/link";
 import { EnTete } from "@/components/en-tete";
 import { BoutonDeconnexion } from "@/components/bouton-deconnexion";
 import { MARQUE } from "@/lib/marque";
@@ -20,12 +21,14 @@ export const metadata: Metadata = {
     default: `${MARQUE.nom} — ${MARQUE.accroche}`,
     template: `%s`,
   },
-  description: `${MARQUE.accroche} de la ${MARQUE.collectivite} : lecture automatique des dossiers numérisés, typage des pièces, contrôle des données, recevabilité, pré-instruction et enregistrement dans le logiciel métier.`,
+  description: `${MARQUE.accroche} de la ${MARQUE.collectivite} : lecture automatique des dossiers numérisés, déliassage, contrôle des données, complétude et conformité, rapport de contrôle et enregistrement dans le logiciel métier.`,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="fr" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+    // suppressHydrationWarning : certaines extensions de navigateur déployées sur les postes (ex. IT Hit, WebDAV)
+    // ajoutent un attribut à <html> avant le chargement de React ; l'écart ne concerne que cette balise.
+    <html lang="fr" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col bg-slate-50">
         <EnTete />
         <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 py-8 sm:px-6">{children}</div>
@@ -34,8 +37,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <p>
               <span className="font-semibold text-slate-700">{MARQUE.nom}</span> · {MARQUE.accroche.toLowerCase()} de la {MARQUE.collectivite}
             </p>
-            <p className="flex items-center gap-3">
+            <p className="flex flex-wrap items-center gap-3">
               <span>{MARQUE.version} · données fictives, aucune donnée personnelle réelle</span>
+              <Link href="/outils/ocr" className="hover:text-blue-700 hover:underline">
+                Banc d&apos;essai OCR
+              </Link>
               <BoutonDeconnexion />
             </p>
           </div>

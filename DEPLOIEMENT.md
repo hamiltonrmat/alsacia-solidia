@@ -72,12 +72,13 @@ Vercel ne réapplique pas les variables à un déploiement existant : **redéplo
 1. Ouvrir l'adresse fournie par Vercel : la page de connexion doit s'afficher.
 2. Saisir un mauvais mot de passe : refus.
 3. Saisir le bon : vous arrivez sur l'accueil, et « Quitter la démonstration » apparaît dans le pied de page.
-4. Module GED, lot #2347, « Prendre en charge et lire le dossier » sur Jean DUPONT : la lecture doit aboutir en quelques secondes et vous amener au typage des pièces.
-5. En navigation privée, vérifier qu'aucune page n'est accessible sans le mot de passe.
+4. « Traitement des dossiers », GED, lot #2347, « Prendre en charge et lire le dossier » sur Jean DUPONT : la lecture doit aboutir en quelques secondes et vous amener au déliassage.
+5. Mener le dossier jusqu'à « Complétude et conformité » et cliquer sur « Valider et générer le rapport » : l'aperçu du rapport de contrôle (PDF) doit s'afficher avec son logo, ce qui confirme que la route `/api/rapport` lit bien `public/solidia-logo.png` sur Vercel.
+6. En navigation privée, vérifier qu'aucune page n'est accessible sans le mot de passe.
 
 ## 7. Ce qui reste local à chaque poste
 
-Les dossiers en cours, leur journal et leurs courriers sont conservés dans le navigateur de chaque visiteur : deux personnes qui ouvrent la démonstration ne voient pas la même bannette. C'est l'objet de l'étape suivante du projet, une base partagée (Supabase).
+Les dossiers en cours, leur journal et leur rapport de contrôle sont conservés dans le navigateur de chaque visiteur : deux personnes qui ouvrent la démonstration ne voient pas la même bannette. C'est l'objet de l'étape suivante du projet, une base partagée (Supabase).
 
 ## 8. Tester la protection en local
 

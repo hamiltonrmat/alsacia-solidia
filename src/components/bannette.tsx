@@ -19,8 +19,8 @@ export function cheminEtape(id: string, etape: Etape): string {
 const FILTRES: Array<{ id: string; libelle: string; statuts: StatutDossier[] | null }> = [
   { id: "tous", libelle: "Tous", statuts: null },
   { id: "a_traiter", libelle: "À traiter", statuts: ["recu", "en_cours"] },
-  { id: "attente", libelle: "En attente de pièces", statuts: ["en_attente_pieces"] },
-  { id: "transmis", libelle: "Transmis", statuts: ["transmis_ems", "transmis_caisse", "oriente_mdph", "clos"] },
+  { id: "complets", libelle: "Transmis complets", statuts: ["transmis_complet"] },
+  { id: "incomplets", libelle: "Transmis incomplets", statuts: ["transmis_incomplet"] },
 ];
 
 function Ligne({ dossier, onRetirer }: { dossier: EtatDossier; onRetirer: () => void }) {
@@ -58,6 +58,8 @@ function Ligne({ dossier, onRetirer }: { dossier: EtatDossier; onRetirer: () => 
           <span className="text-xs text-slate-500">
             Solis : usager {dossier.export.numeroUsager}, demande {dossier.export.numeroDossier}
           </span>
+        ) : dossier.rapport ? (
+          <span className="text-xs text-slate-500">Rapport de contrôle généré, transmission à faire</span>
         ) : null}
         <Bouton variante="discret" onClick={onRetirer} className="ml-auto px-0 py-0 text-sm text-slate-500">
           Retirer du poste
@@ -80,15 +82,16 @@ export function Bannette() {
   const actif = FILTRES.find((f) => f.id === filtre) ?? FILTRES[0];
   const liste = actif.statuts ? tous.filter((d) => actif.statuts?.includes(d.statut)) : tous;
 
+  const retirer = (d: EtatDossier) => {
+    if (window.confirm(`Retirer ${d.id} du poste ? Son état de traitement et son journal seront effacés de ce navigateur.`)) supprimer(d.id);
+  };
+
   if (tous.length === 0) {
     return (
-      <Carte titre="Aucun dossier en cours sur ce poste">
+      <Carte titre="Aucun dossier pris en charge sur ce poste">
         <p className="text-sm text-slate-600">
-          La bannette se remplit depuis la gestion électronique des documents : choisissez un lot, puis prenez en charge un dossier.
+          La bannette se remplit depuis la GED : choisissez un lot, puis prenez en charge un dossier. Il apparaîtra ici avec son avancement.
         </p>
-        <div className="mt-3">
-          <Bouton href="/ged">Aller à la GED</Bouton>
-        </div>
       </Carte>
     );
   }
@@ -112,8 +115,8 @@ export function Bannette() {
             </button>
           );
         })}
-        <Bouton variante="secondaire" href="/ged" className="ml-auto">
-          Prendre un dossier dans la GED
+        <Bouton variante="secondaire" href="/solis" className="ml-auto">
+          Consulter Solis
         </Bouton>
       </div>
 
@@ -122,7 +125,7 @@ export function Bannette() {
       ) : (
         <ul className="grid gap-3 lg:grid-cols-2">
           {liste.map((d) => (
-            <Ligne key={d.id} dossier={d} onRetirer={() => supprimer(d.id)} />
+            <Ligne key={d.id} dossier={d} onRetirer={() => retirer(d)} />
           ))}
         </ul>
       )}

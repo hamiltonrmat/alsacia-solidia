@@ -7,14 +7,18 @@ import { nomUsager } from "@/lib/dossier-utils";
 import { LIBELLES_STATUT, TEINTES_STATUT } from "@/lib/statuts";
 import { ETAPES, useDossierStore, type Etape, type EvenementJournal } from "@/store/dossier-store";
 
-const ORDRE: Etape[] = ["decoupage", "extraction", "conformite", "decision", "export", "termine"];
+/** Ordre du parcours ; la GED est toujours franchie pour un dossier pris en charge. */
+const ORDRE: Array<Etape | "ged"> = ["ged", "decoupage", "extraction", "conformite", "export", "termine"];
 
 const LIBELLES_CONTEXTE: Record<string, string> = {
-  import: "Import",
-  typage: "Typage",
+  import: "GED",
+  deliassage: "Déliassage",
+  typage: "Déliassage",
   controle: "Contrôle",
   usager: "Usager",
-  recevabilite: "Recevabilité",
+  completude: "Complétude",
+  recevabilite: "Complétude",
+  rapport: "Rapport",
   courrier: "Courrier",
   "pre-instruction": "Pré-instruction",
   transmission: "Transmission",
@@ -55,8 +59,8 @@ export function EnTeteDossier({ id }: { id: string }) {
   if (!dossier) {
     return (
       <Alerte teinte="attention" titre={`Le dossier ${id} n'est pas chargé dans ce poste de travail`}>
-        <Link href="/ged" className="font-medium underline">
-          Retourner à la GED pour l&apos;importer
+        <Link href="/dossiers" className="font-medium underline">
+          Retourner au traitement des dossiers pour le prendre en charge depuis la GED
         </Link>
       </Alerte>
     );
@@ -69,7 +73,7 @@ export function EnTeteDossier({ id }: { id: string }) {
     <div className="flex flex-col gap-4">
       <nav aria-label="Fil d'Ariane" className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
         <Link href="/dossiers" className="font-medium text-blue-700 hover:underline">
-          Module 2 · Traitement des dossiers
+          Traitement des dossiers
         </Link>
         <span aria-hidden>›</span>
         <span>{dossier.id}</span>
@@ -88,6 +92,7 @@ export function EnTeteDossier({ id }: { id: string }) {
           <Badge>Reçu le {dossier.dateReception}</Badge>
           {dossier.dateCompletude ? <Badge teinte="succes">Complet le {dossier.dateCompletude}</Badge> : null}
           <Badge>{dossier.nbPages} pages</Badge>
+          {dossier.rapport ? <Badge teinte="primaire">Rapport de contrôle</Badge> : null}
           {dossier.export ? <Badge teinte="info">Solis {dossier.export.numeroDossier}</Badge> : null}
         </div>
       </div>
@@ -95,7 +100,8 @@ export function EnTeteDossier({ id }: { id: string }) {
       <ol className="flex flex-wrap gap-2">
         {ETAPES.map((e, i) => {
           const atteinte = i <= indexCourant;
-          const active = pathname?.includes(`/${e.id}`) ?? false;
+          const active = e.id !== "ged" && (pathname?.includes(`/${e.id}`) ?? false);
+          const lien = e.id === "ged" ? "/dossiers" : `/dossiers/${dossier.id}/${e.id}`;
           const classes = active
             ? "border-blue-600 bg-blue-600 text-white"
             : atteinte
@@ -112,7 +118,7 @@ export function EnTeteDossier({ id }: { id: string }) {
           return (
             <li key={e.id}>
               {atteinte ? (
-                <Link href={`/dossiers/${dossier.id}/${e.id}`} className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition ${classes}`}>
+                <Link href={lien} title={e.resume} className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition ${classes}`}>
                   {contenu}
                 </Link>
               ) : (

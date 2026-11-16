@@ -1,24 +1,25 @@
 /**
- * Test de bout en bout du pipeline de pré-instruction, en ligne de commande.
+ * Test de bout en bout du traitement d'un dossier, en ligne de commande.
  *
  * Enchaîne contre un serveur de développement en cours d'exécution :
- * OCR du dossier → typage des pièces → extraction de chaque pièce →
- * rapprochement usager → complétude → pré-instruction. Affiche les résultats
- * clés et enregistre le détail.
+ * OCR du dossier → déliassage → extraction de chaque pièce → rapprochement
+ * usager → complétude et conformité → rapport de contrôle. Affiche les
+ * résultats clés, enregistre le détail et, sur demande, le PDF du rapport.
  *
  * Lancer : npm run dev (dans un terminal) puis
- *          npx tsx scripts/tester-pipeline.ts D-2026-0305 [http://localhost:3000] [sortie.json]
+ *          npx tsx scripts/tester-pipeline.ts D-2026-0305 [http://localhost:3000] [sortie.json] [rapport.pdf]
  */
 
 import { writeFileSync } from "node:fs";
-import { trouverDossierFictif } from "../src/data/dossiers-fictifs";
+import { cheminPdfDossier, trouverDossierFictif } from "../src/data/dossiers-fictifs";
 import type { CandidatSolis } from "../src/data/solis";
 import { classerPages, LIBELLES_PIECES, regrouperEnPieces, TYPES_A_ECARTER, TYPES_EXTRAITS, type Piece, type TypePiece } from "../src/lib/decoupage";
 import { aplatirChamps } from "../src/lib/extraction/schemas";
+import { construireRapport } from "../src/lib/rapport/construire";
 import { evaluerConformite, type Lecteur } from "../src/lib/regles/conformite";
-import { evaluerDecision } from "../src/lib/regles/decision";
+import type { EtatDossier, ExtractionPiece } from "../src/store/dossier-store";
 
-const [, , dossierId = "D-2026-0305", base = "http://localhost:3000", sortie] = process.argv;
+const [, , dossierId = "D-2026-0305", base = "http://localhost:3000", sortie, sortiePdf] = process.argv;
 
 async function poster<T>(chemin: string, corps?: unknown): Promise<T> {
   const reponse = await fetch(`${base}${chemin}`, {
@@ -44,16 +45,17 @@ async function main() {
   const ocr = await poster<{ pages: Array<{ index: number; markdown: string }>; modele: string; dureeMs: number }>(`/api/dossiers/${dossierId}/ocr`);
   console.log(`\n[OCR] ${ocr.pages.length} pages en ${(ocr.dureeMs / 1000).toFixed(1)} s (${ocr.modele})`);
 
-  // 2. Typage des pièces
+  // 2. Déliassage
   const pagesClassees = classerPages(ocr.pages);
   const pieces = regrouperEnPieces(pagesClassees);
-  console.log(`\n[Typage] ${pieces.length} pièces`);
+  console.log(`\n[Déliassage] ${pieces.length} pièces`);
   for (const p of pieces) {
     console.log(`  ${LIBELLES_PIECES[p.type].padEnd(46)} p. ${p.pages.join(",").padEnd(12)} confiance ${(p.confiance * 100).toFixed(0)} %${TYPES_A_ECARTER.includes(p.type) ? "  (écartée)" : ""}`);
   }
 
   // 3. Extraction
   const extractions = new Map<TypePiece, Record<string, unknown>>();
+  const extractionsParPiece: Record<string, ExtractionPiece> = {};
   console.log("\n[Extraction]");
   for (const piece of pieces.filter((p: Piece) => TYPES_EXTRAITS.includes(p.type))) {
     if (extractions.has(piece.type)) continue;
@@ -61,6 +63,7 @@ async function main() {
     const t0 = Date.now();
     const res = await poster<{ modele: string; champs: Record<string, unknown>; usage: { promptTokens: number; completionTokens: number } }>("/api/extraction", { type: piece.type, markdown });
     extractions.set(piece.type, res.champs);
+    extractionsParPiece[piece.id] = { pieceId: piece.id, type: piece.type, modele: res.modele, champs: res.champs, corrections: {}, confirmations: {}, valide: true };
     const champs = aplatirChamps(res.champs);
     const nonLus = champs.filter((c) => c.valeur === null).length;
     const faibles = champs.filter((c) => c.valeur !== null && c.confiance < 0.5).length;
@@ -125,7 +128,7 @@ async function main() {
   const retenu = solis.candidats.find((c) => c.critere === "nir") ?? null;
   console.log(`  choix simulé : ${retenu ? `rattacher ${retenu.usager.numeroUsager}` : "nouvel usager"}`);
 
-  // 5. Complétude et recevabilité
+  // 5. Complétude et conformité
   const pagesCerfa = pagesClassees.filter((p) => p.type === "cerfa_formulaire" && p.pageCerfa !== undefined).map((p) => p.pageCerfa as number);
   const conformite = evaluerConformite({
     pieces: pieces.filter((p) => !TYPES_A_ECARTER.includes(p.type)),
@@ -134,17 +137,53 @@ async function main() {
     pagesCerfa,
     rapprochement: { confirme: true, usager: retenu?.usager ?? null, demandeEnCours: retenu?.demandeEnCours ?? null },
   });
-  console.log(`\n[Complétude] ${conformite.recevabilite} — ${conformite.synthese}`);
+  console.log(`\n[Complétude] ${conformite.verdict} — ${conformite.synthese}`);
   for (const c of conformite.controles.filter((c) => c.statut !== "ok")) console.log(`  ${c.statut.padEnd(9)} ${c.libelle} — ${c.detail}`);
 
-  // 6. Pré-instruction
-  const decision = evaluerDecision({ pieces, lire, dateReception: fictif.dateReception, recevabilite: conformite.recevabilite });
-  console.log(`\n[Pré-instruction] ${decision.orientation} — ${decision.recommandation}`);
-  for (const r of decision.regles) console.log(`  ${r.statut.padEnd(13)} ${r.libelle} — ${r.detail}`);
+  // 6. Rapport de contrôle (sans intervention de l'agent : aucune vérification ni correction)
+  const etat: EtatDossier = {
+    id: fictif.id,
+    lotId: fictif.lotId,
+    libelle: fictif.libelleGed,
+    dateReception: fictif.dateReception,
+    cheminPdf: cheminPdfDossier(fictif),
+    nbPages: ocr.pages.length,
+    importeLe: new Date(debut).toISOString(),
+    numeroEnregistrement: `REC-TEST-${fictif.id.slice(-4)}`,
+    statut: "en_cours",
+    etape: "conformite",
+    revision: 0,
+    ocr: { pages: ocr.pages, modele: ocr.modele, dureeMs: ocr.dureeMs },
+    pagesClassees,
+    pieces,
+    extractions: extractionsParPiece,
+    rapprochement: {
+      criteres: { nir: lire("cerfa_formulaire", "demandeur.nir"), nomNaissance: lire("cerfa_formulaire", "demandeur.nom_naissance"), nomUsage: lire("cerfa_formulaire", "demandeur.nom_usage"), dateNaissance: lire("cerfa_formulaire", "demandeur.date_naissance") },
+      candidats: solis.candidats,
+      rechercheLe: new Date().toISOString(),
+      decision: retenu ? { type: "existant", numeroUsager: retenu.usager.numeroUsager, numeroDemandeEnCours: retenu.demandeEnCours?.numero ?? null } : { type: "nouveau" },
+      confirmeLe: new Date().toISOString(),
+    },
+    journal: [],
+  };
+  const rapport = construireRapport(etat, {
+    conformite,
+    dateCompletude: conformite.verdict === "non_conforme" ? null : fictif.dateReception,
+    genereLe: new Date().toISOString(),
+  });
+  console.log(`\n[Rapport] robustesse OCR ${rapport.ocr.global.indice ?? "—"} / 100 (${rapport.ocr.global.niveau}), ${rapport.ocr.global.champs} champs, ${rapport.ocr.global.nonLus} non lus`);
+  for (const p of rapport.ocr.pages) console.log(`  p.${String(p.numero).padEnd(3)} ${p.libelleType.padEnd(46)} ${p.indice === null ? "—" : `${p.indice} / 100`}`);
+
+  if (sortiePdf) {
+    const reponse = await fetch(`${base}/api/rapport`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rapport }) });
+    if (!reponse.ok) throw new Error(`/api/rapport → ${reponse.status} ${await reponse.text()}`);
+    writeFileSync(sortiePdf, Buffer.from(await reponse.arrayBuffer()));
+    console.log(`  PDF (${reponse.headers.get("X-Nombre-Pages")} pages, SHA-256 ${reponse.headers.get("X-Empreinte-Sha256")?.slice(0, 16)}…) enregistré dans ${sortiePdf}`);
+  }
   console.log(`\nDurée totale ${((Date.now() - debut) / 1000).toFixed(0)} s`);
 
   if (sortie) {
-    writeFileSync(sortie, JSON.stringify({ ocr, pagesClassees, pieces, extractions: Object.fromEntries(extractions), solis, conformite, decision }, null, 2));
+    writeFileSync(sortie, JSON.stringify({ ocr, pagesClassees, pieces, extractions: Object.fromEntries(extractions), solis, conformite, rapport }, null, 2));
     console.log(`Détail enregistré dans ${sortie}`);
   }
 }
