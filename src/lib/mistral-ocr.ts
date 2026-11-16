@@ -1,5 +1,7 @@
 import "server-only";
 
+import { appelerMistral, ErreurAppelMistral, messageErreurMistral } from "./mistral-http";
+
 /**
  * Client minimal pour l'API OCR de Mistral (endpoint /v1/ocr).
  *
@@ -112,31 +114,23 @@ export async function ocrDocument(input: OcrInput): Promise<OcrResult> {
 
   let response: Response;
   try {
-    response = await fetch(MISTRAL_OCR_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
+    // Nouvelles tentatives sur erreur passagère (503, 502…), dans le délai imparti.
+    ({ reponse: response } = await appelerMistral(
+      MISTRAL_OCR_URL,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
       },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(DELAI_MS),
-    });
+      { service: "de lecture", modele: model, echeance: Date.now() + DELAI_MS },
+    ));
   } catch (error) {
-    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
-      throw new MistralOcrError(
-        504,
-        `Le service de lecture (Mistral, modèle ${model}) n'a pas répondu en ${DELAI_MS / 1000} s. Réessayez dans quelques instants.`,
-      );
-    }
-    throw new MistralOcrError(502, `Service de lecture injoignable : ${error instanceof Error ? error.message : "erreur réseau"}.`);
+    if (error instanceof ErreurAppelMistral) throw new MistralOcrError(error.status, error.message);
+    throw error;
   }
 
   if (!response.ok) {
-    const detail = (await response.text()).slice(0, 500);
-    throw new MistralOcrError(
-      response.status,
-      `Mistral OCR a répondu ${response.status} : ${detail || response.statusText}`,
-    );
+    throw new MistralOcrError(response.status, `Mistral OCR a refusé la demande (erreur ${response.status}) : ${await messageErreurMistral(response)}`);
   }
 
   const data = (await response.json()) as MistralOcrResponse;

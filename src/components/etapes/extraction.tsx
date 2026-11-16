@@ -11,6 +11,9 @@ import { aplatirChamps, CHAMPS_CRITIQUES, estChampCritique, libelleValeur, optio
 import { lireReponseApi } from "@/lib/reponse-api";
 import { useDossierStore, type EtatDossier, type ExtractionPiece } from "@/store/dossier-store";
 
+/** Nombre d'extractions lancées en même temps vers le serveur (et donc vers Mistral). */
+const EXTRACTIONS_SIMULTANEES = 2;
+
 /** Champs critiques d'une pièce restant à vérifier (ni confirmés ni corrigés). */
 function critiquesRestants(extraction: ExtractionPiece | undefined, piece: Piece): string[] {
   const critiques = CHAMPS_CRITIQUES[piece.type] ?? [];
@@ -36,12 +39,15 @@ export function EtapeExtraction({ id }: { id: string }) {
   const [enCours, setEnCours] = useState<Set<string>>(new Set());
   const [voirOcr, setVoirOcr] = useState(false);
   const lancees = useRef(new Set<string>());
+  /** Extractions en vol, pour en limiter le nombre simultané. */
+  const enVol = useRef(new Set<string>());
 
   const piecesAExtraire: Piece[] = (dossier?.pieces ?? []).filter((p) => TYPES_EXTRAITS.includes(p.type));
 
   const extraire = useCallback(
     async (piece: Piece) => {
       if (!dossier) return;
+      enVol.current.add(piece.id);
       setEnCours((s) => new Set(s).add(piece.id));
       const existante = dossier.extractions[piece.id];
       const base: ExtractionPiece = {
@@ -62,6 +68,7 @@ export function EtapeExtraction({ id }: { id: string }) {
       } catch (e) {
         definirExtraction(id, { ...base, erreur: e instanceof Error ? e.message : "Extraction impossible" });
       } finally {
+        enVol.current.delete(piece.id);
         setEnCours((s) => {
           const copie = new Set(s);
           copie.delete(piece.id);
@@ -72,16 +79,22 @@ export function EtapeExtraction({ id }: { id: string }) {
     [dossier, id, definirExtraction],
   );
 
-  // Lance l'extraction des pièces qui n'en ont pas encore, une seule fois chacune.
+  // Lance l'extraction des pièces qui n'en ont pas encore, une seule fois chacune, quelques-unes à la fois :
+  // une rafale de demandes simultanées est ce qu'un service saturé refuse en premier (503).
   useEffect(() => {
     if (!monte || !dossier) return;
     for (const piece of piecesAExtraire) {
+      if (enVol.current.size >= EXTRACTIONS_SIMULTANEES) break;
       const existante = dossier.extractions[piece.id];
       if (existante?.champs || existante?.erreur || lancees.current.has(piece.id)) continue;
       lancees.current.add(piece.id);
       void extraire(piece);
     }
   }, [monte, dossier, piecesAExtraire, extraire]);
+
+  async function relancerErreurs(pieces: Piece[]) {
+    for (const p of pieces) await extraire(p);
+  }
 
   if (!monte || !dossier) return null;
   if (piecesAExtraire.length === 0) {
@@ -110,6 +123,8 @@ export function EtapeExtraction({ id }: { id: string }) {
     for (const chemin of restants) confirmerChamp(id, piece.id, chemin, true);
   }
 
+  const enErreur = piecesAExtraire.filter((p) => dossier.extractions[p.id]?.erreur && !enCours.has(p.id));
+
   const manque: string[] = [];
   if (!toutExtrait) manque.push("extraction de toutes les pièces");
   if (!toutVerifie(dossier, piecesAExtraire)) manque.push("vérification des champs critiques");
@@ -131,12 +146,23 @@ export function EtapeExtraction({ id }: { id: string }) {
         }
       />
 
+      {enErreur.length ? (
+        <Alerte teinte="danger" titre={`${enErreur.length} extraction${enErreur.length > 1 ? "s" : ""} en erreur`}>
+          <p>{dossier.extractions[enErreur[0].id]?.erreur}</p>
+          <div className="mt-2">
+            <Bouton variante="secondaire" onClick={() => void relancerErreurs(enErreur)}>
+              Relancer {enErreur.length > 1 ? `les ${enErreur.length} extractions en erreur` : "l'extraction en erreur"}
+            </Bouton>
+          </div>
+        </Alerte>
+      ) : null}
+
       <div className="flex flex-wrap gap-2">
         {piecesAExtraire.map((p) => {
           const e = dossier.extractions[p.id];
           const actif = p.id === piece.id;
           const reste = critiquesRestants(e, p).length;
-          const etat = enCours.has(p.id) ? "…" : e?.erreur ? "!" : e?.champs ? (reste ? `${reste} à vérifier` : "✓") : "";
+          const etat = enCours.has(p.id) ? "…" : e?.erreur ? "!" : e?.champs ? (reste ? `${reste} à vérifier` : "✓") : "en attente";
           return (
             <button
               key={p.id}

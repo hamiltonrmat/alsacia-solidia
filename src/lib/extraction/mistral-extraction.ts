@@ -1,5 +1,7 @@
 import "server-only";
 
+import { appelerMistral, ErreurAppelMistral, messageErreurMistral } from "@/lib/mistral-http";
+
 import type { TypePiece } from "@/lib/decoupage";
 import { chiffres, ibanValide, nirValide } from "@/lib/identifiants";
 import { optionsChamp, SCHEMAS_PAR_TYPE, type ChampExtrait } from "./schemas";
@@ -19,11 +21,22 @@ const MISTRAL_CHAT_URL = "https://api.mistral.ai/v1/chat/completions";
  */
 const MODELE_PAR_DEFAUT = "mistral-small-2603";
 
-/** Délai d'attente de Mistral, inférieur à la durée maximale des fonctions (60 s). */
+/**
+ * Modèle de secours (Mistral Medium 3.5), essayé si le modèle habituel reste
+ * indisponible malgré les nouvelles tentatives (503 du 16/11/2026). Le modèle
+ * réellement utilisé est enregistré avec l'extraction et affiché à l'agent.
+ */
+const MODELE_SECOURS = "mistral-medium-2604";
+
+/** Budget total d'une extraction, inférieur à la durée maximale des fonctions (60 s). */
 const DELAI_MS = 50_000;
+/** Part du budget laissée au modèle habituel, tentatives comprises. */
+const DELAI_PRINCIPAL_MS = 35_000;
+/** Temps restant minimal pour que le modèle de secours vaille la peine d'être essayé. */
+const DELAI_MINIMAL_SECOURS_MS = 12_000;
 
 /** Modèles autorisés pour l'extraction (surcharge possible par requête). */
-export const MODELES_EXTRACTION = ["mistral-small-2603", "mistral-small-latest", "mistral-medium-latest", "mistral-large-latest"] as const;
+export const MODELES_EXTRACTION = ["mistral-small-2603", "mistral-medium-2604", "mistral-small-latest", "mistral-medium-latest", "mistral-large-latest"] as const;
 export type ModeleExtraction = (typeof MODELES_EXTRACTION)[number];
 
 export class MistralExtractionError extends Error {
@@ -225,36 +238,54 @@ export async function extraireChamps(type: TypePiece, markdown: string, modeleDe
   const definition = SCHEMAS_PAR_TYPE[type];
   if (!definition) throw new MistralExtractionError(400, `Aucune extraction prévue pour le type « ${type} ».`);
 
-  const modele = modeleDemande || process.env.MISTRAL_CHAT_MODEL || MODELE_PAR_DEFAUT;
-  let reponse: Response;
-  try {
-    reponse = await fetch(MISTRAL_CHAT_URL, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${cleApi()}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: modele,
-        temperature: 0,
-        messages: [
-          { role: "system", content: `${CONSIGNE_GENERALE}\n\n${definition.consigne}` },
-          { role: "user", content: markdown },
-        ],
-        response_format: {
-          type: "json_schema",
-          json_schema: { name: definition.nom, schema: definition.schema, strict: true },
-        },
-      }),
-      signal: AbortSignal.timeout(DELAI_MS),
+  // Modèle imposé (requête ou variable d'environnement), sinon le modèle habituel puis le modèle de secours.
+  const modeleImpose = modeleDemande || process.env.MISTRAL_CHAT_MODEL;
+  const modeles = modeleImpose ? [modeleImpose] : [MODELE_PAR_DEFAUT, MODELE_SECOURS];
+  const debut = Date.now();
+  const corps = (modele: string) =>
+    JSON.stringify({
+      model: modele,
+      temperature: 0,
+      messages: [
+        { role: "system", content: `${CONSIGNE_GENERALE}\n\n${definition.consigne}` },
+        { role: "user", content: markdown },
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: { name: definition.nom, schema: definition.schema, strict: true },
+      },
     });
-  } catch (error) {
-    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
-      throw new MistralExtractionError(504, `Le service d'extraction (Mistral, modèle ${modele}) n'a pas répondu en ${DELAI_MS / 1000} s. Relancez l'extraction de la pièce.`);
+
+  let reponse: Response | null = null;
+  let derniereErreur: ErreurAppelMistral | null = null;
+  for (const [rang, modele] of modeles.entries()) {
+    const secours = rang > 0;
+    // Le modèle habituel garde une part du budget pour le modèle de secours.
+    const echeance = secours ? debut + DELAI_MS : debut + (modeles.length > 1 ? DELAI_PRINCIPAL_MS : DELAI_MS);
+    if (secours && echeance - Date.now() < DELAI_MINIMAL_SECOURS_MS) break;
+    try {
+      ({ reponse } = await appelerMistral(
+        MISTRAL_CHAT_URL,
+        { method: "POST", headers: { Authorization: `Bearer ${cleApi()}`, "Content-Type": "application/json" }, body: corps(modele) },
+        { service: "d'extraction", modele, echeance },
+      ));
+      break;
+    } catch (error) {
+      if (!(error instanceof ErreurAppelMistral)) throw error;
+      derniereErreur = error;
+      if (!secours && modeles.length > 1) console.warn(`[extraction] ${modele} indisponible, essai du modèle de secours ${MODELE_SECOURS}`);
     }
-    throw new MistralExtractionError(502, `Service d'extraction injoignable : ${error instanceof Error ? error.message : "erreur réseau"}.`);
+  }
+  if (!reponse) {
+    const message = derniereErreur?.message ?? "Extraction impossible.";
+    throw new MistralExtractionError(
+      derniereErreur?.status ?? 502,
+      modeles.length > 1 ? `${message} Le modèle habituel (${MODELE_PAR_DEFAUT}) et le modèle de secours (${MODELE_SECOURS}) ont été essayés.` : message,
+    );
   }
 
   if (!reponse.ok) {
-    const detail = (await reponse.text()).slice(0, 500);
-    throw new MistralExtractionError(reponse.status, `Mistral a répondu ${reponse.status} : ${detail || reponse.statusText}`);
+    throw new MistralExtractionError(reponse.status, `Mistral a refusé la demande d'extraction (erreur ${reponse.status}) : ${await messageErreurMistral(reponse)}`);
   }
 
   const data = (await reponse.json()) as {
