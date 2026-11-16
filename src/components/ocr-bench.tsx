@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { lireReponseApi } from "@/lib/reponse-api";
 
 type OcrResponse = {
   fileName: string;
@@ -35,10 +36,7 @@ export function OcrBench() {
 
     try {
       const response = await fetch("/api/ocr", { method: "POST", body: formData });
-      const data = (await response.json()) as OcrResponse | { error: string };
-      if (!response.ok || "error" in data) {
-        throw new Error("error" in data ? data.error : `Erreur ${response.status}`);
-      }
+      const data = await lireReponseApi<OcrResponse>(response);
       setResult(data);
       setStatus("done");
     } catch (err) {

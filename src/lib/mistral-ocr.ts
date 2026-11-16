@@ -9,7 +9,23 @@ import "server-only";
  */
 
 const MISTRAL_OCR_URL = "https://api.mistral.ai/v1/ocr";
-const DEFAULT_MODEL = "mistral-ocr-latest";
+
+/**
+ * Modèle épinglé sur une version précise plutôt que sur l'alias
+ * « mistral-ocr-latest ». Le 16/11/2026, cet alias pointait vers OCR 4.1
+ * (mistral-ocr-4-1), qui ne répondait pas (plus de 200 s pour une seule page),
+ * alors que mistral-ocr-2512 (OCR 3) lisait un dossier de 16 pages en 10 s.
+ * Un changement d'alias chez Mistral ne doit pas casser l'outil : tester une
+ * nouvelle version avec MISTRAL_OCR_MODEL avant de changer cette valeur.
+ */
+const DEFAULT_MODEL = "mistral-ocr-2512";
+
+/**
+ * Délai d'attente de Mistral, inférieur à la durée maximale des fonctions
+ * (60 s) : au-delà, le serveur renvoie une erreur lisible au lieu d'être
+ * interrompu par la plateforme.
+ */
+const DELAI_MS = 50_000;
 
 export type OcrPage = {
   /** Index de page, à partir de 0. */
@@ -84,8 +100,9 @@ export async function ocrDocument(input: OcrInput): Promise<OcrResult> {
   const dataUrl = toDataUrl(input.bytes, input.mimeType);
   const isImage = input.mimeType.startsWith("image/");
 
+  const model = process.env.MISTRAL_OCR_MODEL || DEFAULT_MODEL;
   const body = {
-    model: process.env.MISTRAL_OCR_MODEL ?? DEFAULT_MODEL,
+    model,
     document: isImage
       ? { type: "image_url", image_url: dataUrl }
       : { type: "document_url", document_url: dataUrl },
@@ -93,14 +110,26 @@ export async function ocrDocument(input: OcrInput): Promise<OcrResult> {
     include_image_base64: false,
   };
 
-  const response = await fetch(MISTRAL_OCR_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
+  let response: Response;
+  try {
+    response = await fetch(MISTRAL_OCR_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(DELAI_MS),
+    });
+  } catch (error) {
+    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
+      throw new MistralOcrError(
+        504,
+        `Le service de lecture (Mistral, modèle ${model}) n'a pas répondu en ${DELAI_MS / 1000} s. Réessayez dans quelques instants.`,
+      );
+    }
+    throw new MistralOcrError(502, `Service de lecture injoignable : ${error instanceof Error ? error.message : "erreur réseau"}.`);
+  }
 
   if (!response.ok) {
     const detail = (await response.text()).slice(0, 500);

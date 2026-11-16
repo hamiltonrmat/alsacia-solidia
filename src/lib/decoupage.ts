@@ -34,6 +34,8 @@ export type PageClassee = {
   pageCerfa?: number;
   /** Premières lignes utiles de la page, pour l'aperçu. */
   apercu: string;
+  /** Interne au classement : code du CERFA lu sans numéro, numéro à déduire des pages voisines. */
+  cerfaSansNumero?: boolean;
 };
 
 export type Piece = {
@@ -81,6 +83,7 @@ function normaliser(texte: string): string {
   return texte
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
+    .replace(/[’‘`]/g, "'")
     .toLowerCase();
 }
 
@@ -135,12 +138,59 @@ const REGLES: Regle[] = [
   },
 ];
 
-/** Numéro officiel de page lu dans le pied de page « cerfa 16301*01 / n / 09/2023 ». */
+/** Code du CERFA, tel qu'il apparaît dans le pied de page (l'astérisque est parfois échappé en Markdown). */
+const CODE_CERFA = /16301\s*\\?\*\s*01/;
+
+/**
+ * Numéro officiel de page lu dans le pied de page « cerfa 16301*01 / n / 09/2023 ».
+ *
+ * Selon le modèle de lecture, ce pied de page ne sort pas toujours de la même
+ * façon : ordre « 16301*01, n, 09/2023 » (modèles de 2025), ou numéro juste
+ * après le code, pied de page remonté en haut de la page (« 09/2023 16301*01
+ * 6 »), et souvent sans numéro du tout (mistral-ocr-2512, novembre 2026).
+ */
 function numeroPageCerfa(texte: string): number | undefined {
-  const m = texte.match(/16301\s*\\?\*\s*01\s*(?:\n\s*)*(\d{1,2})\s*(?:\n\s*)*09\/2023/);
-  if (!m) return undefined;
-  const n = Number(m[1]);
-  return n >= 1 && n <= 13 ? n : undefined;
+  const valide = (n: number) => (n >= 1 && n <= 13 ? n : undefined);
+  const ancien = texte.match(/16301\s*\\?\*\s*01\s*(?:\n\s*)*(\d{1,2})\s*(?:\n\s*)*09\/2023/);
+  if (ancien) return valide(Number(ancien[1]));
+  // Numéro juste après le code, qui n'est ni une date (09/2023) ni un numéro de rubrique (« 3. »).
+  for (const m of texte.matchAll(/16301\s*\\?\*\s*01[ \t]*(?:\n\s*)?(\d{1,2})(?![\d/.])/g)) {
+    const n = valide(Number(m[1]));
+    if (n !== undefined) return n;
+  }
+  return undefined;
+}
+
+/**
+ * Intitulés propres à chaque page du CERFA, pour la reconnaître quand son
+ * numéro manque au pied de page. Relevés sur la lecture des 13 pages
+ * (mistral-ocr-2512) ; chaque intitulé ne figure que sur sa page.
+ */
+const SIGNATURES_PAGES_CERFA: Record<number, string[]> = {
+  1: ["notice, partie a conserver", "comment constituer votre dossier", "quelle prestation peut etre demandee"],
+  2: ["a quoi ces prestations correspondent", "conditions d'attribution", "qui peut beneficier"],
+  3: ["qu'est-ce que la carte mobilite inclusion", "quelles sont les etapes de la demande", "comment en faire la demande"],
+  4: ["par les caisses de retraite :", "documents justificatifs a fournir", "pieces justificatives a fournir"],
+  5: ["situation du demandeur", "cadre reserve a l'administration", "ancien lieu de residence du demandeur"],
+  6: ["situation familiale", "mesure de protection du demandeur", "les informations du conjoint"],
+  7: ["personne proche a contacter", "identification de l'organisme competent", "le lien avec le demandeur"],
+  8: ["revenu declare", "biens immobiliers et mobiliers", "residence principale du demandeur", "biens mobiliers et capitaux"],
+  9: ["signature du demandeur et/ou de son representant legal", "remplir cette partie uniquement si le demandeur sollicite l'apa", "7. carte mobilite inclusion"],
+  10: ["donnees a caractere personnel", "responsable du traitement", "mentions d'information"],
+  11: ["certificat medical pour demander", "coordonnees du patient", "pathologies et signes cliniques"],
+  12: ["prises en charges therapeutiques", "perspective d'evolution de l'atteinte", "evaluation de la perte d'autonomie", "mobilite – deplacements"],
+  13: ["deficiences sensorielles", "autres actes essentiels de la vie quotidienne", "cognition / capacite cognitive", "identification du medecin"],
+};
+
+/** Page du CERFA reconnue à ses intitulés : le meilleur score, s'il est net. */
+function pageCerfaParIntitules(texte: string): { page: number; trouves: string[] } | undefined {
+  const scores = Object.entries(SIGNATURES_PAGES_CERFA)
+    .map(([page, intitules]) => ({ page: Number(page), trouves: intitules.filter((i) => texte.includes(i)) }))
+    .filter((s) => s.trouves.length > 0)
+    .sort((a, b) => b.trouves.length - a.trouves.length);
+  if (scores.length === 0) return undefined;
+  if (scores.length > 1 && scores[1].trouves.length === scores[0].trouves.length) return undefined;
+  return scores[0];
 }
 
 function typeDepuisPageCerfa(n: number): TypePage {
@@ -176,6 +226,7 @@ export function classerPage(numero: number, markdown: string): PageClassee {
     };
   }
 
+  // 1. Numéro lu au pied de page : le plus sûr.
   const pageCerfa = numeroPageCerfa(markdown);
   if (pageCerfa !== undefined) {
     return {
@@ -186,6 +237,24 @@ export function classerPage(numero: number, markdown: string): PageClassee {
       pageCerfa,
       apercu,
     };
+  }
+
+  // 2. Code du CERFA présent sans numéro, ou intitulés caractéristiques : la page est reconnue à ses intitulés.
+  const codeCerfa = CODE_CERFA.test(markdown);
+  const parIntitules = pageCerfaParIntitules(texte);
+  if (parIntitules && (codeCerfa || parIntitules.trouves.length >= 2)) {
+    return {
+      numero,
+      type: typeDepuisPageCerfa(parIntitules.page),
+      confiance: codeCerfa ? 0.92 : 0.85,
+      justification: `Page ${parIntitules.page} du CERFA reconnue à ses intitulés (${parIntitules.trouves.slice(0, 2).join(", ")})${codeCerfa ? ", pied de page sans numéro" : ""}`,
+      pageCerfa: parIntitules.page,
+      apercu,
+    };
+  }
+  if (codeCerfa) {
+    // 3. Page du CERFA dont le numéro sera déduit de ses voisines (voir classerPages).
+    return { numero, type: "cerfa_formulaire", confiance: 0.6, justification: "Pied de page « cerfa 16301*01 » sans numéro", apercu, cerfaSansNumero: true };
   }
 
   let meilleur: { type: TypePage; score: number; trouves: string[] } | null = null;
@@ -209,8 +278,35 @@ export function classerPage(numero: number, markdown: string): PageClassee {
   };
 }
 
+/**
+ * Classe toutes les pages d'un dossier. Une page portant le code du CERFA mais
+ * ni numéro ni intitulé reconnaissable reçoit le numéro qui suit celui de la
+ * page précédente (ou qui précède celui de la suivante) : les pages d'un même
+ * formulaire se suivent dans le scan.
+ */
 export function classerPages(pages: Array<{ markdown: string }>): PageClassee[] {
-  return pages.map((p, i) => classerPage(i + 1, p.markdown));
+  const classees = pages.map((p, i) => classerPage(i + 1, p.markdown));
+  for (let passe = 0; passe < 2; passe += 1) {
+    classees.forEach((page, i) => {
+      if (!page.cerfaSansNumero) return;
+      const precedente = classees[i - 1]?.pageCerfa;
+      const suivante = classees[i + 1]?.pageCerfa;
+      const deduite = precedente !== undefined && precedente < 13 ? precedente + 1 : suivante !== undefined && suivante > 1 ? suivante - 1 : undefined;
+      if (deduite === undefined) return;
+      classees[i] = {
+        ...page,
+        type: typeDepuisPageCerfa(deduite),
+        pageCerfa: deduite,
+        confiance: 0.8,
+        justification: `Page ${deduite} du CERFA déduite de la page ${precedente !== undefined ? "précédente" : "suivante"} (pied de page sans numéro)`,
+        cerfaSansNumero: undefined,
+      };
+    });
+  }
+  return classees.map(({ cerfaSansNumero: _ignore, ...page }) => {
+    void _ignore;
+    return page;
+  });
 }
 
 /**

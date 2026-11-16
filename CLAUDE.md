@@ -22,8 +22,8 @@ Toutes les données manipulées sont **synthétiques**. Le but est la démonstra
 | Framework | Next.js 16.3 (App Router, Turbopack), React 19, TypeScript | Dossier `src/`, alias `@/*` |
 | Styles | Tailwind CSS 4, thème clair imposé (variant `dark` rattaché à une classe `.dark` jamais posée), palette slate | Composants maison dans `src/components/ui.tsx` |
 | État client | zustand + `persist` (localStorage, clé `solidia-dossiers`, version 3 avec `migrate`, reprise de l'ancienne clé `instructocr-dossiers`) | Un dossier pris en charge progresse d'étape en étape, avec statut, révision et journal |
-| OCR | API Mistral `POST /v1/ocr`, `mistral-ocr-latest` | Serveur uniquement, `fetch` sans SDK, Markdown par page |
-| Extraction | API Mistral chat, sortie JSON contrainte (`response_format: json_schema`, strict) | `mistral-small-latest` par défaut, surcharge par requête (`modele`), post-traitement déterministe |
+| OCR | API Mistral `POST /v1/ocr`, **`mistral-ocr-2512` épinglé** (surcharge `MISTRAL_OCR_MODEL`) | Serveur uniquement, `fetch` sans SDK, Markdown par page, délai d'attente 50 s |
+| Extraction | API Mistral chat, sortie JSON contrainte (`response_format: json_schema`, strict) | **`mistral-small-2603` épinglé** (surcharge `MISTRAL_CHAT_MODEL` ou `modele` par requête), délai 50 s, post-traitement déterministe |
 | PDF | pdf-lib (dépendance d'exécution : rapport de contrôle, découpage physique ; et remplissage du CERFA dans le générateur) + pdfjs-dist et @napi-rs/canvas (rasterisation, dev) | Polices standard (WinAnsi), voir section 7 |
 | Hébergement cible | Vercel + GitHub | Procédure dans `DEPLOIEMENT.md`. Trois variables : `MISTRAL_API_KEY`, `SOLIDIA_MOT_DE_PASSE`, `SOLIDIA_SECRET_SESSION`. Supabase prévu pour remplacer le localStorage |
 
@@ -116,6 +116,9 @@ Enseignements sur la lecture des cases à cocher par `mistral-ocr-latest` :
 - Post-traitement déterministe (`postTraitement`) : (1) un symbole de case cochée cité dans `extrait` mais absent du texte abaisse la confiance à 0,3 ; (2) pour tout champ à cases du CERFA, si la ligne d'origine ne contient aucun symbole de case, la valeur devient null (0,2) ; (3) pour les groupes de la partie 6, l'option seule sans case parmi des cases vides est retenue à 0,6 ; (4) IBAN et NIR sont relus par expression régulière et vérifiés par leur clé.
 - L'annotation structurée de l'API OCR hallucine des valeurs plausibles : écartée. `mistral-medium` invente moins mais rate d'autres champs et prend deux fois plus de temps.
 - Les champs non lus sont le fonctionnement normal du contrôle des données : l'agent complète, document en regard. L'API OCR ne donne aucune confiance par caractère : c'est pourquoi l'indice de robustesse du rapport est calculé sur les champs (section 7).
+- **Ne jamais utiliser les alias `-latest`** (incident du 16/11/2026) : `mistral-ocr-latest` est passé à OCR 4.1 (`mistral-ocr-4-1`), qui ne répondait plus (plus de 200 s pour une page), d'où en ligne un dépassement de la durée des fonctions Vercel et l'erreur « Unexpected token 'A'… is not valid JSON ». `mistral-ocr-2512` (OCR 3) lit 16 pages en 10 s. Avant de changer de version : tester avec `scripts/tester-pipeline.ts`. Lister les versions et leurs alias : `GET https://api.mistral.ai/v1/models`.
+- **Pied de page avec OCR 3** : le numéro de page est le plus souvent perdu (`cerfa 16301*01` seul), parfois en tête de page (`09/2023 16301*01 6`) ou déformé (`evrb 16301*01`). Le déliassage (`decoupage.ts`) reconnaît donc une page du CERFA en trois temps : numéro lu au pied de page (0,98), sinon intitulés propres à la page (`SIGNATURES_PAGES_CERFA`, 0,92 avec le code, 0,85 sans), sinon déduction depuis les pages voisines (0,8). Vérifié le 16/11/2026 sur les 38 pages de 0301, 0304 et 0305 : toutes bien classées.
+- Les routes renvoient un JSON d'erreur lisible avant d'être interrompues (délai Mistral 50 s < `maxDuration` 60 s) ; côté navigateur, `lireReponseApi` (`src/lib/reponse-api.ts`) traduit une réponse non JSON (page d'erreur Vercel) en message compréhensible.
 
 ## 6. Scénarios de démonstration (src/data/dossiers-fictifs.ts)
 
@@ -128,7 +131,7 @@ Enseignements sur la lecture des cases à cocher par `mistral-ocr-latest` :
 | D-2026-0305 | Robert MOREAU, 86 ans | CNI en tête, CM en fin ; tutelle, signature de la tutrice, jugement absent → bloquant ; taxe foncière ; **demande déjà en cours dans Solis** → rattacher, pas de doublon |
 | D-2026-0306 | Hélène GARNIER ép. PETIT, 80 ans | CNI expirée (règle +5 ans), date de naissance incohérente CERFA/CNI ; déménagement récent transmis à Solis |
 
-Résultats OCR vérifiés par `scripts/tester-pipeline.ts` le 15/09/2026 : 0301, 0304, 0305 conformes aux attentes, sauf les cases du questionnaire de 0301 non lues ce jour-là (variance OCR). Le 16/11/2026, le rapport de 0305 a été généré hors ligne à partir de la vérité terrain : 9 pages, verdict « incomplet » (jugement), rendu déterministe (même empreinte en script et sur le serveur).
+Résultats OCR vérifiés par `scripts/tester-pipeline.ts` le 15/09/2026 : 0301, 0304, 0305 conformes aux attentes, sauf les cases du questionnaire de 0301 non lues ce jour-là (variance OCR). Le 16/11/2026 avec `mistral-ocr-2512` : 0301 complet et conforme, robustesse 98/100, questionnaire lu, parcours complet en 45 s. Le 16/11/2026, le rapport de 0305 a été généré hors ligne à partir de la vérité terrain : 9 pages, verdict « incomplet » (jugement), rendu déterministe (même empreinte en script et sur le serveur).
 
 ## 7. Organisation et parcours métier (refonte du 16/11/2026)
 

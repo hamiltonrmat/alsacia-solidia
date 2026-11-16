@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { LIBELLES_CRITERE, type CandidatSolis } from "@/data/solis";
 import { Alerte, Badge, Bouton, Carte, Chargement } from "@/components/ui";
 import { identiteLue } from "@/lib/dossier-utils";
+import { lireReponseApi } from "@/lib/reponse-api";
 import { useDossierStore } from "@/store/dossier-store";
 
 /**
@@ -38,10 +39,7 @@ export function RapprochementUsager({ id }: { id: string }) {
     derniereCle.current = cle;
     const criteres = JSON.parse(cle) as { nir: string | null; nomNaissance: string | null; nomUsage: string | null; dateNaissance: string | null };
     fetch("/api/solis", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "rechercher", ...criteres }) })
-      .then(async (r) => {
-        if (!r.ok) throw new Error(`Solis a répondu ${r.status}`);
-        return (await r.json()) as { candidats: CandidatSolis[] };
-      })
+      .then((r) => lireReponseApi<{ candidats: CandidatSolis[] }>(r))
       .then((data) => {
         setErreur(null);
         definirRapprochement(id, { criteres, candidats: data.candidats, rechercheLe: new Date().toISOString() });

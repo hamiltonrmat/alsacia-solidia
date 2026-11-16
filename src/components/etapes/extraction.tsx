@@ -8,6 +8,7 @@ import { VisionneusePdf } from "@/components/visionneuse-pdf";
 import { LIBELLES_PIECES, TYPES_EXTRAITS, type Piece } from "@/lib/decoupage";
 import { markdownPiece, pagePourChamp } from "@/lib/dossier-utils";
 import { aplatirChamps, CHAMPS_CRITIQUES, estChampCritique, libelleValeur, optionsChamp } from "@/lib/extraction/schemas";
+import { lireReponseApi } from "@/lib/reponse-api";
 import { useDossierStore, type EtatDossier, type ExtractionPiece } from "@/store/dossier-store";
 
 /** Champs critiques d'une pièce restant à vérifier (ni confirmés ni corrigés). */
@@ -56,8 +57,7 @@ export function EtapeExtraction({ id }: { id: string }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ type: piece.type, markdown: markdownPiece(dossier, piece.pages) }),
         });
-        const data = (await reponse.json()) as { modele: string; champs: Record<string, unknown> } | { error: string };
-        if (!reponse.ok || "error" in data) throw new Error("error" in data ? data.error : `Erreur ${reponse.status}`);
+        const data = await lireReponseApi<{ modele: string; champs: Record<string, unknown> }>(reponse);
         definirExtraction(id, { ...base, modele: data.modele, champs: data.champs });
       } catch (e) {
         definirExtraction(id, { ...base, erreur: e instanceof Error ? e.message : "Extraction impossible" });

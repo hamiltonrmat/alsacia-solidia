@@ -46,7 +46,7 @@ export async function POST(request: Request, ctx: RouteContext<"/api/dossiers/[i
     });
   } catch (error) {
     if (error instanceof MistralOcrError) {
-      return NextResponse.json({ error: error.message }, { status: 502 });
+      return NextResponse.json({ error: error.message }, { status: error.status === 504 ? 504 : 502 });
     }
     console.error("[api/dossiers/ocr] erreur inattendue", error);
     return NextResponse.json({ error: "Erreur interne lors de l'OCR." }, { status: 500 });

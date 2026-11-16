@@ -6,6 +6,7 @@ import { CarteRapport } from "@/components/rapport-pdf";
 import { Alerte, Badge, Bouton, Carte, Titre, useMonte } from "@/components/ui";
 import { LIBELLES_PIECES, TYPES_A_ECARTER } from "@/lib/decoupage";
 import { lecteurDepuisDossier, metadonneesExport, nomUsager, usagerRattache } from "@/lib/dossier-utils";
+import { lireReponseApi } from "@/lib/reponse-api";
 import { LIBELLES_STATUT, TEINTES_STATUT, type StatutDossier } from "@/lib/statuts";
 import { useDossierStore, type DocumentRetourGed, type DocumentSolis } from "@/store/dossier-store";
 
@@ -77,10 +78,14 @@ export function EtapeExport({ id }: { id: string }) {
           rapport,
         }),
       });
-      const data = (await reponse.json()) as
-        | { action: "cree" | "rattache" | "mis_a_jour"; numeroUsager: string; numeroDossier: string; statut: StatutDossier; horodatage: string; documents: DocumentSolis[] }
-        | { error: string };
-      if (!reponse.ok || "error" in data) throw new Error("error" in data ? data.error : `Erreur ${reponse.status}`);
+      const data = await lireReponseApi<{
+        action: "cree" | "rattache" | "mis_a_jour";
+        numeroUsager: string;
+        numeroDossier: string;
+        statut: StatutDossier;
+        horodatage: string;
+        documents: DocumentSolis[];
+      }>(reponse);
       definirExport(dossier.id, { ...data, metadonnees, retourGed: documents });
     } catch (e) {
       setErreur(e instanceof Error ? e.message : "Enregistrement impossible");

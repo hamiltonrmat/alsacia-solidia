@@ -11,10 +11,19 @@ import { optionsChamp, SCHEMAS_PAR_TYPE, type ChampExtrait } from "./schemas";
  */
 
 const MISTRAL_CHAT_URL = "https://api.mistral.ai/v1/chat/completions";
-const MODELE_PAR_DEFAUT = "mistral-small-latest";
+
+/**
+ * Modèle épinglé (version vers laquelle pointait « mistral-small-latest » le
+ * 16/11/2026), pour qu'un changement d'alias chez Mistral ne modifie pas la
+ * qualité ni la durée de l'extraction à l'insu de tous. Voir mistral-ocr.ts.
+ */
+const MODELE_PAR_DEFAUT = "mistral-small-2603";
+
+/** Délai d'attente de Mistral, inférieur à la durée maximale des fonctions (60 s). */
+const DELAI_MS = 50_000;
 
 /** Modèles autorisés pour l'extraction (surcharge possible par requête). */
-export const MODELES_EXTRACTION = ["mistral-small-latest", "mistral-medium-latest", "mistral-large-latest"] as const;
+export const MODELES_EXTRACTION = ["mistral-small-2603", "mistral-small-latest", "mistral-medium-latest", "mistral-large-latest"] as const;
 export type ModeleExtraction = (typeof MODELES_EXTRACTION)[number];
 
 export class MistralExtractionError extends Error {
@@ -216,23 +225,32 @@ export async function extraireChamps(type: TypePiece, markdown: string, modeleDe
   const definition = SCHEMAS_PAR_TYPE[type];
   if (!definition) throw new MistralExtractionError(400, `Aucune extraction prévue pour le type « ${type} ».`);
 
-  const modele = modeleDemande ?? process.env.MISTRAL_CHAT_MODEL ?? MODELE_PAR_DEFAUT;
-  const reponse = await fetch(MISTRAL_CHAT_URL, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${cleApi()}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: modele,
-      temperature: 0,
-      messages: [
-        { role: "system", content: `${CONSIGNE_GENERALE}\n\n${definition.consigne}` },
-        { role: "user", content: markdown },
-      ],
-      response_format: {
-        type: "json_schema",
-        json_schema: { name: definition.nom, schema: definition.schema, strict: true },
-      },
-    }),
-  });
+  const modele = modeleDemande || process.env.MISTRAL_CHAT_MODEL || MODELE_PAR_DEFAUT;
+  let reponse: Response;
+  try {
+    reponse = await fetch(MISTRAL_CHAT_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${cleApi()}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: modele,
+        temperature: 0,
+        messages: [
+          { role: "system", content: `${CONSIGNE_GENERALE}\n\n${definition.consigne}` },
+          { role: "user", content: markdown },
+        ],
+        response_format: {
+          type: "json_schema",
+          json_schema: { name: definition.nom, schema: definition.schema, strict: true },
+        },
+      }),
+      signal: AbortSignal.timeout(DELAI_MS),
+    });
+  } catch (error) {
+    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
+      throw new MistralExtractionError(504, `Le service d'extraction (Mistral, modèle ${modele}) n'a pas répondu en ${DELAI_MS / 1000} s. Relancez l'extraction de la pièce.`);
+    }
+    throw new MistralExtractionError(502, `Service d'extraction injoignable : ${error instanceof Error ? error.message : "erreur réseau"}.`);
+  }
 
   if (!reponse.ok) {
     const detail = (await reponse.text()).slice(0, 500);

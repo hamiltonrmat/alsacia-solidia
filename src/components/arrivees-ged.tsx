@@ -6,6 +6,7 @@ import type { DossierGed, LotGedAvecDossiers } from "@/app/api/ged/lots/route";
 import { cheminEtape, libelleEtape } from "@/components/bannette";
 import { Alerte, Badge, Bouton, Carte, Chargement, useMonte } from "@/components/ui";
 import { classerPages, regrouperEnPieces } from "@/lib/decoupage";
+import { lireReponseApi } from "@/lib/reponse-api";
 import { LIBELLES_STATUT, TEINTES_STATUT } from "@/lib/statuts";
 import { useDossierStore } from "@/store/dossier-store";
 
@@ -31,10 +32,7 @@ export function ArriveesGed() {
   useEffect(() => {
     let annule = false;
     fetch("/api/ged/lots")
-      .then(async (r) => {
-        if (!r.ok) throw new Error(`La GED a répondu ${r.status}`);
-        return (await r.json()) as { lots: LotGedAvecDossiers[] };
-      })
+      .then((r) => lireReponseApi<{ lots: LotGedAvecDossiers[] }>(r))
       .then((data) => {
         if (annule) return;
         setLots(data.lots);
@@ -56,8 +54,7 @@ export function ArriveesGed() {
     setImportEnCours({ id: dossier.id, message: `Lecture OCR en cours (${dossier.nbPages} pages)…` });
     try {
       const reponse = await fetch(`/api/dossiers/${dossier.id}/ocr`, { method: "POST" });
-      const data = (await reponse.json()) as { pages: Array<{ index: number; markdown: string }>; modele: string; dureeMs: number } | { error: string };
-      if (!reponse.ok || "error" in data) throw new Error("error" in data ? data.error : `Erreur ${reponse.status}`);
+      const data = await lireReponseApi<{ pages: Array<{ index: number; markdown: string }>; modele: string; dureeMs: number }>(reponse);
       setImportEnCours({ id: dossier.id, message: "Déliassage automatique…" });
       const pagesClassees = classerPages(data.pages);
       importerDossier({

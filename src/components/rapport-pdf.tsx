@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Alerte, Badge, Bouton, Carte, Chargement, type Teinte } from "@/components/ui";
 import { LIBELLES_NIVEAU, nomFichierRapport, type NiveauRobustesse, type RapportControle } from "@/lib/rapport/modele";
 import type { Verdict } from "@/lib/regles/conformite";
+import { lireReponseApi, messageReponseInattendue } from "@/lib/reponse-api";
 import { useDossierStore, type EtatDossier } from "@/store/dossier-store";
 
 /**
@@ -24,13 +25,9 @@ export async function demanderRapportPdf(rapport: RapportControle): Promise<Mise
     body: JSON.stringify({ rapport }),
   });
   if (!reponse.ok) {
-    let message = `Le serveur a répondu ${reponse.status}`;
-    try {
-      message = ((await reponse.json()) as { error?: string }).error ?? message;
-    } catch {
-      // réponse non JSON : on garde le message générique
-    }
-    throw new Error(message);
+    // Réponse d'erreur : JSON de la route, ou page texte de la plateforme (délai dépassé).
+    await lireReponseApi(reponse);
+    throw new Error(messageReponseInattendue(reponse.status));
   }
   return {
     blob: await reponse.blob(),
